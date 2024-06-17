@@ -155,7 +155,7 @@ const MyProSidebar = () => {
             
             <Item
               title="Facturar"
-              to="/invoices"
+              to="/"
               icon={<ReceiptOutlinedIcon />}
               selected={selected}
               setSelected={setSelected}
