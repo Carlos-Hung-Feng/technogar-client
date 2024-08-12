@@ -10,9 +10,10 @@ import { ColorModeContext, tokens } from "../../../theme";
 import { useTheme, Box, Typography, IconButton } from "@mui/material";
 import ReceiptOutlinedIcon from "@mui/icons-material/ReceiptOutlined";
 import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
-import AddShoppingCartOutlinedIcon from '@mui/icons-material/AddShoppingCartOutlined';
-import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined';
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import AddShoppingCartOutlinedIcon from "@mui/icons-material/AddShoppingCartOutlined";
+import InventoryOutlinedIcon from "@mui/icons-material/InventoryOutlined";
+import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
@@ -21,6 +22,8 @@ import SwitchLeftOutlinedIcon from "@mui/icons-material/SwitchLeftOutlined";
 
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
+import { AuthAPI } from "../../../api/auth";
+import { useAuth } from "../../login/authContext";
 
 const Item = ({ title, to, icon, selected, setSelected }) => {
   const theme = useTheme();
@@ -46,6 +49,7 @@ const MyProSidebar = () => {
   const [selected, setSelected] = useState("Dashboard");
   const { sidebarRTL, setSidebarRTL, sidebarImage } = useSidebarContext();
   const { collapseSidebar, toggleSidebar, collapsed, broken } = useProSidebar();
+
   return (
     <Box
       sx={{
@@ -125,17 +129,17 @@ const MyProSidebar = () => {
           </MenuItem>
           {!collapsed && (
             <Box mb="25px">
-              <Box
-                display="flex"
-                justifyContent="center"
-                alignItems="center"
-              >
+              <Box display="flex" justifyContent="center" alignItems="center">
                 <img
                   className="avater-image"
                   alt="profile user"
                   width="100px"
                   height="100px"
-                  src={theme.palette.mode === "dark" ? "../../assets/logo_dark_mode.png" : "../../assets/logo_light_mode.png"}
+                  src={
+                    theme.palette.mode === "dark"
+                      ? "../../assets/logo_dark_mode.png"
+                      : "../../assets/logo_light_mode.png"
+                  }
                   style={{ cursor: "pointer", borderRadius: "50%" }}
                 />
               </Box>
@@ -152,11 +156,18 @@ const MyProSidebar = () => {
             </Box>
           )}
           <Box paddingLeft={collapsed ? undefined : "10%"}>
-            
             <Item
               title="Facturar"
               to="/"
               icon={<ReceiptOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+
+            <Item
+              title="Cliente"
+              to="/customer"
+              icon={<GroupOutlinedIcon />}
               selected={selected}
               setSelected={setSelected}
             />
@@ -166,7 +177,7 @@ const MyProSidebar = () => {
               color={colors.grey[300]}
               sx={{ m: "15px 20px 5px 20px" }}
             >
-              Amins
+              Admin
             </Typography>
 
             <Item
@@ -198,7 +209,7 @@ const MyProSidebar = () => {
               selected={selected}
               setSelected={colorMode.toggleColorMode}
             /> */}
-            {theme.palette.mode === "dark" ? (
+            {/* {theme.palette.mode === "dark" ? (
               <Item
                 title="Light Mode"
                 icon={<LightModeOutlinedIcon />}
@@ -210,11 +221,14 @@ const MyProSidebar = () => {
                 icon={<DarkModeOutlinedIcon />}
                 setSelected={colorMode.toggleColorMode}
               />
-            )}
+            )} */}
             <Item
               title="Log Out"
               to="/login"
               icon={<PersonOutlinedIcon />}
+              setSelected={() => {
+                AuthAPI.logout();
+              }}
             />
           </Box>
         </Menu>

@@ -1,16 +1,20 @@
-import { instance } from './axios';
+import instance from './axios';
 
 export const AuthAPI = {
     login: function (credentials) {
         return instance.request({
-        url: '/auth/login',
+        url: '/auth/local',
         method: 'POST',
         data: credentials,
         })
         .then(response => {
-        const { token } = response.data;
+        const token  = response.data.jwt;
+        const userId  = response.data.user.id;
         if (token) {
             localStorage.setItem('token', token);
+        }
+        if (userId) {
+            localStorage.setItem('userId', userId);
         }
         return response.data;
         })
@@ -18,11 +22,13 @@ export const AuthAPI = {
     },
     logout: function () {
         localStorage.removeItem('token');
-        return instance.request({
-        url: '/auth/logout',
-        method: 'POST',
-        })
-        .then(response => response.data)
-        .catch(error => { throw error; });
+        localStorage.removeItem('userId');
+        
+        // return instance.request({
+        // url: '/auth/logout',
+        // method: 'POST',
+        // })
+        // .then(response => response.data)
+        // .catch(error => { throw error; });
     },
 };

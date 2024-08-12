@@ -1,9 +1,9 @@
 import instance from '../axios';
 
-export const PaymentMethodAPI = {
+export const InvoiceDiscountAPI = {
     getAll: function () {
         return instance.request({
-        url: `/payment-methods`,
+        url: `/invoice-discounts`,
         method: 'GET',
         })
         .then(response => response.data)
@@ -11,7 +11,7 @@ export const PaymentMethodAPI = {
     },
     get: function (id) {
         return instance.request({
-        url: `/payment-methods/${id}`,
+        url: `/invoice-discounts/${id}`,
         method: 'GET',
         })
         .then(response => response.data)
