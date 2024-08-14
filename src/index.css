@@ -8,6 +8,15 @@ body,
   font-family: "Source Sance Pro", sans-serif;
 } 
 
+@media print {
+  html, body {
+    height: 100vh;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 10px;
 }

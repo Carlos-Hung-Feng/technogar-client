@@ -637,6 +637,9 @@ const Order = () => {
                     onChange={handleInputChange}
                     name="documentName"
                     value={formValues.documentName || ""}
+                    InputLabelProps={{
+                      shrink: true,
+                    }}
                   />
                   <FormControl
                     variant="filled"
@@ -671,17 +674,125 @@ const Order = () => {
                     InputLabelProps={{ shrink: true }}
                   />
                 </Box>
-
-                <Typography
-                  sx={{
-                    fontSize: "35px",
-                    fontWeight: "bold",
-                    padding: "30px 0px 0px",
-                  }}
-                >
-                  Total: {calculateSubtotalSum()}
-                </Typography>
               </Box>
+            </Box>
+
+            <Box
+              backgroundColor={colors.primary[400]}
+              borderRadius="10px"
+              mt="20px"
+            >
+              {formValues.id !== "" ? (
+                <Typography
+                  variant="h5"
+                  color={colors.greenAccent[500]}
+                  sx={{ mb: 2 }}
+                >
+                  Editar Productos &#40;Los cambios se guardan al instante&#41;
+                </Typography>
+              ) : (
+                <Typography
+                  variant="h5"
+                  color={colors.greenAccent[500]}
+                  sx={{ mb: 2 }}
+                >
+                  Agregar Productos
+                </Typography>
+              )}
+
+              <Box
+                display="grid"
+                gap={"30px"}
+                gridTemplateColumns="repeat(12, 1fr)"
+              >
+                <Box gridColumn="span 6">
+                  <Autocomplete
+                    options={filteredProductBasicInfoList}
+                    getOptionLabel={(option) =>
+                      `${option.barCode} - ${option.name}`
+                    }
+                    isOptionEqualToValue={(option, value) => {
+                      return option.id === value.productId;
+                    }}
+                    value={formValues.product || null}
+                    onChange={handleProductChange}
+                    readOnly={
+                      productButtonText !== "AGREGAR PRODUCTO" ? true : false
+                    }
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Producto"
+                        variant="filled"
+                      />
+                    )}
+                  />
+                </Box>
+                <Box gridColumn="span 3">
+                  <TextField
+                    sx={{ width: "100%" }}
+                    variant="filled"
+                    type="number"
+                    label="Cantidad"
+                    name="quantity"
+                    value={formValues.quantity || ""}
+                    onChange={handleInputChange}
+                  />
+                </Box>
+                <Box gridColumn="span 3">
+                  <TextField
+                    sx={{ width: "100%" }}
+                    variant="filled"
+                    type="number"
+                    label="Costo"
+                    name="cost"
+                    value={formValues.cost || ""}
+                    onChange={handleInputChange}
+                  />
+                </Box>
+                <Box
+                  gridColumn="span 12"
+                  display={"flex"}
+                  justifyContent={"flex-end"}
+                >
+                  <Button
+                    color={
+                      productButtonText === "AGREGAR PRODUCTO"
+                        ? "info"
+                        : "warning"
+                    }
+                    variant="contained"
+                    onClick={() =>
+                      addProduct(
+                        formValues.product,
+                        formValues.quantity,
+                        formValues.cost
+                      )
+                    }
+                  >
+                    {productButtonText}
+                  </Button>
+                </Box>
+              </Box>
+              <Box mt="20px" height="40vh">
+                <DataGrid
+                  rows={addedProductList}
+                  columns={COLUMNS}
+                  pageSize={5}
+                  rowsPerPageOptions={[5]}
+                  disableSelectionOnClick
+                />
+              </Box>
+            </Box>
+            <Box display={"flex"} justifyContent={"end"}>
+              <Typography
+                sx={{
+                  fontSize: "35px",
+                  fontWeight: "bold",
+                }}
+              >
+                Total: {calculateSubtotalSum()}
+              </Typography>
             </Box>
             <Box mt="20px" display="flex" justifyContent="flex-end" gap={2}>
               <Button type="button" color="error" variant="contained">
@@ -696,108 +807,6 @@ const Order = () => {
               </Button>
             </Box>
           </form>
-        </Box>
-        <Box
-          backgroundColor={colors.primary[400]}
-          p="15px"
-          borderRadius="10px"
-          mt="20px"
-        >
-          {formValues.id !== "" ? (
-            <Typography
-              variant="h5"
-              color={colors.greenAccent[500]}
-              sx={{ mb: 2 }}
-            >
-              Editar Productos &#40;Los cambios se guardan al instante&#41;
-            </Typography>
-          ) : (
-            <Typography
-              variant="h5"
-              color={colors.greenAccent[500]}
-              sx={{ mb: 2 }}
-            >
-              Agregar Productos
-            </Typography>
-          )}
-
-          <Box
-            display="grid"
-            gap={"30px"}
-            gridTemplateColumns="repeat(12, 1fr)"
-          >
-            <Box gridColumn="span 6">
-              <Autocomplete
-                options={filteredProductBasicInfoList}
-                getOptionLabel={(option) =>
-                  `${option.barCode} - ${option.name}`
-                }
-                isOptionEqualToValue={(option, value) => {
-                  return option.id === value.productId;
-                }}
-                value={formValues.product || null}
-                onChange={handleProductChange}
-                readOnly={
-                  productButtonText !== "AGREGAR PRODUCTO" ? true : false
-                }
-                renderInput={(params) => (
-                  <TextField {...params} label="Producto" variant="filled" />
-                )}
-              />
-            </Box>
-            <Box gridColumn="span 3">
-              <TextField
-                sx={{ width: "100%" }}
-                variant="filled"
-                type="number"
-                label="Cantidad"
-                name="quantity"
-                value={formValues.quantity || ""}
-                onChange={handleInputChange}
-              />
-            </Box>
-            <Box gridColumn="span 3">
-              <TextField
-                sx={{ width: "100%" }}
-                variant="filled"
-                type="number"
-                label="Costo"
-                name="cost"
-                value={formValues.cost || ""}
-                onChange={handleInputChange}
-              />
-            </Box>
-            <Box
-              gridColumn="span 12"
-              display={"flex"}
-              justifyContent={"flex-end"}
-            >
-              <Button
-                color={
-                  productButtonText === "AGREGAR PRODUCTO" ? "info" : "warning"
-                }
-                variant="contained"
-                onClick={() =>
-                  addProduct(
-                    formValues.product,
-                    formValues.quantity,
-                    formValues.cost
-                  )
-                }
-              >
-                {productButtonText}
-              </Button>
-            </Box>
-          </Box>
-          <Box mt="20px" height="40vh">
-            <DataGrid
-              rows={addedProductList}
-              columns={COLUMNS}
-              pageSize={5}
-              rowsPerPageOptions={[5]}
-              disableSelectionOnClick
-            />
-          </Box>
         </Box>
       </Box>
     </Box>

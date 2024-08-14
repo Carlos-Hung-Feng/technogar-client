@@ -44,6 +44,7 @@ export const InvoiceAPI = {
         .catch(error => { throw error; });
     },
     create: function(_data) {
+        console.log(_data)
         let data = {
             'data': {
                 "InvoiceNumber": _data.invoiceNumber,
@@ -74,6 +75,11 @@ export const InvoiceAPI = {
         if (_data.discountId === "") {
             delete data.data.Invoice_Discount;
         }
+        if (_data.NIF === "") {
+            delete data.data.NIF;
+        }
+
+        console.log(data);
 
         return instance.request({
             url: `/invoices`,

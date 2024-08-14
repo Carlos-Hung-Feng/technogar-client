@@ -1,4 +1,4 @@
-import { React, useEffect, useState } from "react";
+import { React, useEffect, useRef, useState } from "react";
 import {
   Box,
   FormControl,
@@ -26,6 +26,9 @@ import { WarehouseAPI } from "../../api/services/WarehouseAPI";
 import { InvoiceAPI } from "../../api/services/InvoiceAPI";
 import Header from "../../components/Header";
 import { ClientAPI } from "../../api/services/ClientAPI";
+import { useReactToPrint } from "react-to-print";
+import Receipt from "../../components/Receipt";
+import Barcode from "react-barcode";
 
 const Invoices = () => {
   const theme = useTheme();
@@ -78,6 +81,15 @@ const Invoices = () => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const [invoiceData, setInvoiceData] = useState(null); // Estado para almacenar los datos de la factura
+
+  const receiptRef = useRef();
+
+  const handlePrint = useReactToPrint({
+    content: () => receiptRef.current,
+    documentTitle: "Recibo de Compra",
+  });
 
   let currencyFormat = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -138,7 +150,7 @@ const Invoices = () => {
     return invoiceNumber;
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     // Aquí puedes manejar la lógica de envío del formulario
 
@@ -157,6 +169,14 @@ const Invoices = () => {
       status: "Paid",
       billedById: parseInt(localStorage.getItem("userId")),
     };
+
+    if (formValues.paymentMethodId !== 1) {
+      data = {
+        ...data,
+        paidWith: calculateTotal(),
+        returned: 0,
+      };
+    }
 
     if (formValues.id === "") {
       InvoiceAPI.create(data)
@@ -181,10 +201,10 @@ const Invoices = () => {
                       parseInt(product.quantity),
                   };
                   WarehouseAPI.update(inventory);
+                  clearInputs();
                 } else {
                   alert("Inventario no suficiente");
                 }
-                alert("Compra facturado exitosamente.");
               });
             });
           });
@@ -193,6 +213,10 @@ const Invoices = () => {
           alert("No se pudo facturar la compra");
           console.error(err);
         });
+
+      alert("Compra facturada exitosamente.");
+      await generateReceipt(data);
+      handlePrint();
     } else {
       data.status = "Canceled";
       InvoiceAPI.update(data)
@@ -212,6 +236,10 @@ const Invoices = () => {
                     parseInt(product.quantity),
                 };
                 WarehouseAPI.update(inventory);
+                setFormValues({
+                  ...formValues,
+                  status: "Canceled",
+                });
               } else {
                 alert("Inventario no suficiente");
               }
@@ -224,6 +252,29 @@ const Invoices = () => {
           console.error(err);
         });
     }
+  };
+
+  const generateReceipt = async (_data) => {
+    let sum = 0;
+    addedProductList.forEach((invoice) => {
+      sum += invoice.subtotal;
+    });
+
+    const newInvoiceData = {
+      invoiceNumber: _data.invoiceNumber,
+      clientName: client.fullName,
+      clientRNC: _data.RNC,
+      subtotal: sum,
+      discount: sum - calculateTotal(),
+      total: calculateTotal(),
+      paymentMethod: paymentMethodList.find(
+        (x) => x.id === _data.paymentMethodId
+      ).attributes.Name,
+      paidWith: _data.paidWith,
+      change: _data.returned,
+      products: addedProductList,
+    };
+    setInvoiceData(newInvoiceData); // Actualiza el estado con los nuevos datos
   };
 
   const getInvoiceByInvoiceNumber = () => {
@@ -265,44 +316,48 @@ const Invoices = () => {
           console.error("No se pudo obtener la factura", err);
         });
     } else {
-      setFormValues({
-        id: "",
-        invoiceNumber: "",
-        NIF: "",
-        RNC: "",
-        note: "",
-        paidWith: "",
-        returned: 0,
-        status: "",
-        paymentMethodId: "",
-        customerId: "",
-        billedById: "",
-        discountId: "",
-
-        productBarCode: "",
-        quantity: 1,
-
-        searchInvoiceParam: "",
-        searchClientParam: "",
-        searchRNCParam: "",
-      });
-
-      setClient({
-        id: "",
-        fullName: "",
-        email: "",
-        telephone: "",
-        address: "",
-        productPreferences: "",
-        paymentMethod: "",
-        identifier: "",
-        lastPurchaseDate: "",
-        note: "",
-        customerType: "",
-        links: "",
-      });
-      setAddedProductList([]);
+      clearInputs();
     }
+  };
+
+  const clearInputs = () => {
+    setFormValues({
+      id: "",
+      invoiceNumber: "",
+      NIF: "",
+      RNC: "",
+      note: "",
+      paidWith: "",
+      returned: 0,
+      status: "",
+      paymentMethodId: "",
+      customerId: "",
+      billedById: "",
+      discountId: "",
+
+      productBarCode: "",
+      quantity: 1,
+
+      searchInvoiceParam: "",
+      searchClientParam: "",
+      searchRNCParam: "",
+    });
+
+    setClient({
+      id: "",
+      fullName: "",
+      email: "",
+      telephone: "",
+      address: "",
+      productPreferences: "",
+      paymentMethod: "",
+      identifier: "",
+      lastPurchaseDate: "",
+      note: "",
+      customerType: "",
+      links: "",
+    });
+    setAddedProductList([]);
   };
 
   const getClientByIdentifier = () => {
@@ -413,7 +468,6 @@ const Invoices = () => {
                 ? data.data[0].attributes.WholesalePrice
                 : data.data[0].attributes.RetailPrice;
           }
-          //TODO: validar si el cliente aplica el precio al por mayor (si no es cliente se le asigna el precio al detalle).
           product = {
             id: data.data[0].id,
             productId: data.data[0].id,
@@ -822,6 +876,9 @@ const Invoices = () => {
                   : "Anulada"}
               </Button>
             </form>
+          </Box>
+          <Box display={"none"}>
+            <Receipt ref={receiptRef} invoiceData={invoiceData} />
           </Box>
         </Box>
       </Box>

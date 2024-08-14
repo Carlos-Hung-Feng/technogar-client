@@ -85,6 +85,7 @@ const Customer = () => {
             ...formValues,
             id: data.data.id,
           });
+          setClientOldName(formValues.fullName);
         })
         .catch((err) => alert("No se pudo crear el cliente", err));
     } else {
@@ -233,7 +234,7 @@ const Customer = () => {
                 type="text"
                 label="# de Identificación"
                 onChange={handleInputChange}
-                name="Identifier"
+                name="identifier"
                 value={formValues.identifier || ""}
                 required
               />
