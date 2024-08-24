@@ -11,14 +11,16 @@ import {
   TextField,
   Typography,
   useTheme,
+  Tooltip,
 } from "@mui/material";
 import { DataGrid, GridActionsCellItem } from "@mui/x-data-grid";
 import { tokens } from "../../theme";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
+import PointOfSaleOutlinedIcon from "@mui/icons-material/PointOfSaleOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CancelIcon from "@mui/icons-material/Cancel";
+import LocalPrintshopOutlinedIcon from "@mui/icons-material/LocalPrintshopOutlined";
 import { PaymentMethodAPI } from "../../api/services/PaymentMethodAPI";
 import { InvoiceDiscountAPI } from "../../api/services/InvoiceDiscountAPI";
 import { ProductAPI } from "../../api/services/ProductAPI";
@@ -27,12 +29,15 @@ import { InvoiceAPI } from "../../api/services/InvoiceAPI";
 import Header from "../../components/Header";
 import { ClientAPI } from "../../api/services/ClientAPI";
 import { useReactToPrint } from "react-to-print";
-import Receipt from "../../components/Receipt";
-import Barcode from "react-barcode";
+import InvoiceReceipt from "../../components/InvoiceReceipt";
+import { CreditNoteAPI } from "../../api/services/CreditNoteAPI";
+import CashCountReceipt from "../../components/CashCountReceipt";
+import CustomModal from "../../components/CustomModal";
 
 const Invoices = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
+  const [openModal, setOpenModal] = useState(false);
 
   const [paymentMethodList, setPaymentMethodList] = useState([]);
   const [discountList, setDiscountList] = useState([]);
@@ -70,9 +75,13 @@ const Invoices = () => {
     customerId: "",
     billedById: "",
     discountId: "",
+    creditNoteAppliedId: "",
+    creditNoteAppliedNumber: "",
+    creditNoteAppliedValue: 0,
+    total: 0,
+    createdAt: new Date(),
 
     productBarCode: "",
-    quantity: 1,
 
     searchInvoiceParam: "",
     searchClientParam: "",
@@ -83,11 +92,18 @@ const Invoices = () => {
   const [error, setError] = useState(null);
 
   const [invoiceData, setInvoiceData] = useState(null); // Estado para almacenar los datos de la factura
+  const invoiceReceiptRef = useRef();
 
-  const receiptRef = useRef();
+  const [cashCountData, setCashCountData] = useState(null); // Estado para almacenar los datos del cuadre de caja
+  const cashCountReceiptRef = useRef();
 
-  const handlePrint = useReactToPrint({
-    content: () => receiptRef.current,
+  const handlePrintCashCount = useReactToPrint({
+    content: () => cashCountReceiptRef.current,
+    documentTitle: "Recibo de cuadre de caja",
+  });
+
+  const handlePrintInvoice = useReactToPrint({
+    content: () => invoiceReceiptRef.current,
     documentTitle: "Recibo de Compra",
   });
 
@@ -135,6 +151,65 @@ const Invoices = () => {
     }
   };
 
+  const handleSubmitModal = () => {
+    handlePrintCashCount();
+    setOpenModal(false);
+  };
+
+  const getCashCount = () => {
+    const today = new Date();
+    let todayString = `${today.getFullYear()}-${
+      today.getMonth() + 1 > 9
+        ? today.getMonth() + 1
+        : "0" + (today.getMonth() + 1)
+    }-${today.getDate()}`;
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    let tomorrowString = `${tomorrow.getFullYear()}-${
+      tomorrow.getMonth() + 1 > 9
+        ? tomorrow.getMonth() + 1
+        : "0" + (tomorrow.getMonth() + 1)
+    }-${tomorrow.getDate()}`;
+    //InvoiceAPI.getInvoiceTotalBetweenDate(todayString, tomorrowString).then(
+    InvoiceAPI.getInvoiceTotalBetweenDate("2024-08-01", "2024-08-25").then(
+      (data) => {
+        const invoiceGroupedByPaymentJson = Object.groupBy(
+          data,
+          ({ paymentMethodId }) => paymentMethodId
+        );
+        let cashCountList = [];
+        let total = 0;
+
+        for (let i in invoiceGroupedByPaymentJson) {
+          let paymentMethodName =
+            invoiceGroupedByPaymentJson[i][0].paymentMethodName;
+          let invoiceCount = invoiceGroupedByPaymentJson[i].length;
+          let sum = 0;
+
+          invoiceGroupedByPaymentJson[i].forEach((invoice) => {
+            sum += invoice.total;
+          });
+
+          total += sum;
+
+          let data = {
+            paymentMethodName: paymentMethodName,
+            count: invoiceCount,
+            subtotal: sum,
+          };
+
+          cashCountList.push(data);
+        }
+        setCashCountData({
+          total: total,
+          invoiceCount: cashCountList,
+        });
+      }
+    );
+    setOpenModal(true);
+    //handlePrintCashCount();
+  };
+
   const invoiceNumberGenerator = () => {
     const invoiceNumber = Math.floor(Math.random() * 1e8)
       .toString()
@@ -162,80 +237,100 @@ const Invoices = () => {
       return;
     }
 
+    let total = calculateTotal();
+
     let data = {
       ...formValues,
+      clientName: client.fullName,
       invoiceNumber: invoiceNumberGenerator(),
-      returned: formValues.paidWith - calculateTotal(),
+      returned: formValues.paidWith - total,
       status: "Paid",
+      total: total,
       billedById: parseInt(localStorage.getItem("userId")),
+      creditNoteAppliedId: formValues.creditNoteAppliedId,
+      creditNoteAppliedNumber: formValues.creditNoteAppliedNumber,
+      creditNoteAppliedValue: formValues.creditNoteAppliedValue,
+      invoice_Products: addedProductList,
     };
 
     if (formValues.paymentMethodId !== 1) {
       data = {
         ...data,
-        paidWith: calculateTotal(),
+        paidWith: total,
         returned: 0,
       };
     }
 
+    await generateReceipt(data);
+
     if (formValues.id === "") {
-      InvoiceAPI.create(data)
+      await InvoiceAPI.create(data)
         .then((data) => {
-          setFormValues({
-            ...formValues,
-            id: data.data.id,
-          });
+          if (formValues.creditNoteAppliedId !== "") {
+            let creditNote = {
+              id: formValues.creditNoteAppliedId,
+              status: "Applied",
+            };
+            CreditNoteAPI.update(creditNote);
+          }
+
           addedProductList.forEach((product) => {
-            InvoiceAPI.addInvoiceProduct(data.data.id, product).then((data) => {
-              WarehouseAPI.getByWarehouseIdAndProductId(
-                1, // por ahora solo tenemos un almacen, y el usuario no esta relacionado con almacen (algo como sucursal, caja, etc.).
-                product.productId
-              ).then((warehouse) => {
-                if (warehouse.data.length > 0) {
-                  let inventory = {
-                    id: warehouse.data[0].id,
-                    warehouse: warehouse.data[0].attributes.Warehouse.data.id,
-                    product: warehouse.data[0].attributes.Product.data.id,
-                    quantity:
-                      parseInt(warehouse.data[0].attributes.Quantity) -
-                      parseInt(product.quantity),
-                  };
-                  WarehouseAPI.update(inventory);
-                  clearInputs();
-                } else {
-                  alert("Inventario no suficiente");
-                }
-              });
-            });
+            InvoiceAPI.addInvoiceProduct(data.data.id, product);
           });
+          let productsGroupedJson = Object.groupBy(
+            addedProductList,
+            ({ productId }) => productId
+          );
+
+          for (let i in productsGroupedJson) {
+            WarehouseAPI.getByWarehouseIdAndProductId(
+              1, // por ahora solo tenemos un almacen, y el usuario no esta relacionado con almacen (algo como sucursal, caja, etc.).
+              i
+            ).then((warehouse) => {
+              if (warehouse.data.length > 0) {
+                let inventory = {
+                  id: warehouse.data[0].id,
+                  quantity:
+                    parseInt(warehouse.data[0].attributes.Quantity) -
+                    productsGroupedJson[i].length,
+                };
+                WarehouseAPI.updateInventory(inventory);
+              } else {
+                alert("Inventario no suficiente");
+              }
+            });
+          }
+          alert("Compra facturada exitosamente.");
         })
         .catch((err) => {
           alert("No se pudo facturar la compra");
           console.error(err);
         });
 
-      alert("Compra facturada exitosamente.");
-      await generateReceipt(data);
-      handlePrint();
+      handlePrintInvoice();
+      clearInputs(data.invoiceNumber);
     } else {
       data.status = "Canceled";
       InvoiceAPI.update(data)
         .then((data) => {
-          addedProductList.forEach((product) => {
+          let productsGroupedJson = Object.groupBy(
+            addedProductList,
+            ({ productId }) => productId
+          );
+
+          for (let i in productsGroupedJson) {
             WarehouseAPI.getByWarehouseIdAndProductId(
               1, // por ahora solo tenemos un almacen, y el usuario no esta relacionado con almacen (algo como sucursal, caja, etc.).
-              product.productId
+              i
             ).then((warehouse) => {
               if (warehouse.data.length > 0) {
                 let inventory = {
                   id: warehouse.data[0].id,
-                  warehouse: warehouse.data[0].attributes.Warehouse.data.id,
-                  product: warehouse.data[0].attributes.Product.data.id,
                   quantity:
                     parseInt(warehouse.data[0].attributes.Quantity) +
-                    parseInt(product.quantity),
+                    productsGroupedJson[i].length,
                 };
-                WarehouseAPI.update(inventory);
+                WarehouseAPI.updateInventory(inventory);
                 setFormValues({
                   ...formValues,
                   status: "Canceled",
@@ -243,9 +338,9 @@ const Invoices = () => {
               } else {
                 alert("Inventario no suficiente");
               }
-              alert("Factura anulada exitosamente.");
             });
-          });
+          }
+          alert("Factura anulada exitosamente.");
         })
         .catch((err) => {
           alert("No se pudo anular la factura");
@@ -256,23 +351,39 @@ const Invoices = () => {
 
   const generateReceipt = async (_data) => {
     let sum = 0;
-    addedProductList.forEach((invoice) => {
-      sum += invoice.subtotal;
-    });
+    if (_data.invoice_Products !== undefined) {
+      _data.invoice_Products.forEach((invoice) => {
+        sum += invoice.price;
+      });
+    } else {
+      addedProductList.forEach((invoice) => {
+        sum += invoice.price;
+      });
+    }
+
+    let discount = discountList.find((x) => x.id === _data.discountId)
+      .attributes.DiscountPercentage;
 
     const newInvoiceData = {
       invoiceNumber: _data.invoiceNumber,
-      clientName: client.fullName,
+      clientName: _data.clientName,
       clientRNC: _data.RNC,
       subtotal: sum,
-      discount: sum - calculateTotal(),
-      total: calculateTotal(),
+      discountPersentage: discount,
+      discount: sum * (discount / 100),
+      total: _data.total,
+      createdAt: _data.createdAt,
       paymentMethod: paymentMethodList.find(
         (x) => x.id === _data.paymentMethodId
       ).attributes.Name,
       paidWith: _data.paidWith,
       change: _data.returned,
-      products: addedProductList,
+      creditNoteAppliedNumber: _data.creditNoteAppliedNumber,
+      creditNoteAppliedValue: _data.creditNoteAppliedValue,
+      products:
+        _data.invoice_Products !== undefined
+          ? _data.invoice_Products
+          : addedProductList,
     };
     setInvoiceData(newInvoiceData); // Actualiza el estado con los nuevos datos
   };
@@ -283,16 +394,28 @@ const Invoices = () => {
     }
     if (formValues.id === "") {
       InvoiceAPI.getInvoiceByInvoiceNumber(formValues.searchInvoiceParam)
-        .then((response) => {
-          if (response !== undefined) {
-            setFormValues(response);
-            setAddedProductList(response.invoice_Products);
+        .then((invoiceResponse) => {
+          if (invoiceResponse !== undefined) {
+            let check = invoiceResponse.invoice_Products.filter(
+              (x) => x.creditNoteNumber !== ""
+            );
 
-            if (response.searchClientParam !== "") {
-              ClientAPI.getClientByIdentifier(response.searchClientParam)
+            if (check.length > 0) {
+              invoiceResponse.status = "CreditNoteGenerated";
+            }
+            setFormValues(invoiceResponse);
+            setAddedProductList(invoiceResponse.invoice_Products);
+
+            if (invoiceResponse.searchClientParam !== "") {
+              ClientAPI.getClientByIdentifier(invoiceResponse.searchClientParam)
                 .then((response) => {
                   if (response !== undefined) {
                     setClient(response);
+                    let data = {
+                      ...invoiceResponse,
+                      clientName: response.fullName,
+                    };
+                    generateReceipt(data);
                   } else {
                     alert(
                       "Número de identificación incorrecto, por favor intenta de nuevo."
@@ -306,6 +429,8 @@ const Invoices = () => {
                     err
                   );
                 });
+            } else {
+              generateReceipt(invoiceResponse);
             }
           } else {
             alert("Número de factura incorrecta, por favor intenta de nuevo.");
@@ -320,7 +445,46 @@ const Invoices = () => {
     }
   };
 
-  const clearInputs = () => {
+  const getCreditNoteByCreditNoteNumber = (e) => {
+    if (formValues.creditNoteAppliedNumber === "") {
+      return;
+    }
+    if (formValues.creditNoteAppliedId === "") {
+      CreditNoteAPI.getCreditNoteByCreditNoteNumber(
+        formValues.creditNoteAppliedNumber
+      )
+        .then((response) => {
+          if (response !== undefined) {
+            if (response.status === "Applied") {
+              alert("Nota de Crédito ya aplicada en otra factura.");
+            } else {
+              setFormValues({
+                ...formValues,
+                creditNoteAppliedId: response.id,
+                creditNoteAppliedValue: response.total,
+              });
+            }
+          } else {
+            alert(
+              "Número de nota de crédito incorrecta, por favor intenta de nuevo."
+            );
+          }
+        })
+        .catch((err) => {
+          alert("No se pudo obtener la nota de crédito");
+          console.error("No se pudo obtener la nota de crédito", err);
+        });
+    } else {
+      setFormValues({
+        ...formValues,
+        creditNoteAppliedId: "",
+        creditNoteAppliedNumber: "",
+        creditNoteAppliedValue: 0,
+      });
+    }
+  };
+
+  const clearInputs = async (_searchInvoiceParam = "") => {
     setFormValues({
       id: "",
       invoiceNumber: "",
@@ -334,11 +498,13 @@ const Invoices = () => {
       customerId: "",
       billedById: "",
       discountId: "",
+      creditNoteAppliedId: "",
+      creditNoteAppliedNumber: "",
+      creditNoteAppliedValue: 0,
 
       productBarCode: "",
-      quantity: 1,
 
-      searchInvoiceParam: "",
+      searchInvoiceParam: _searchInvoiceParam,
       searchClientParam: "",
       searchRNCParam: "",
     });
@@ -365,8 +531,6 @@ const Invoices = () => {
       return;
     }
 
-    setAddedProductList([]);
-
     if (client.id === "") {
       ClientAPI.getClientByIdentifier(formValues.searchClientParam)
         .then((response) => {
@@ -386,30 +550,12 @@ const Invoices = () => {
           alert("No se pudo obtener informacion del cliente");
           console.error("No se pudo obtener informacion del cliente", err);
         });
-    } else {
-      setClient({
-        id: "",
-        fullName: "",
-        email: "",
-        telephone: "",
-        address: "",
-        productPreferences: "",
-        paymentMethod: "",
-        identifier: "",
-        lastPurchaseDate: "",
-        note: "",
-        customerType: "",
-        links: "",
-      });
-      setFormValues({
-        ...formValues,
-        customerId: "",
-        searchClientParam: "",
-      });
     }
+
+    clearInputs();
   };
 
-  const addProduct = (e, editMode = false) => {
+  const addProduct = (e) => {
     if (e.key !== "Enter" || e.keyCode !== 13) {
       return;
     }
@@ -418,86 +564,48 @@ const Invoices = () => {
       return;
     }
 
-    let product = addedProductList.find(
+    let quantity = addedProductList.filter(
       (x) => x.barCode === formValues.productBarCode
-    );
-    let price = 0;
+    ).length;
 
-    let quantity = parseInt(formValues.quantity);
+    ProductAPI.getProductByBarCode(formValues.productBarCode)
+      .then((data) => {
+        console.log(data);
+        let price = data.retailPrice;
 
-    if (product !== undefined) {
-      if (editMode) {
-        product = {
-          ...product,
-          quantity: quantity,
-          subtotal: quantity * product.price,
-        };
-      } else {
-        product = {
-          ...product,
-          quantity: product.quantity + quantity,
-          subtotal: (product.quantity + quantity) * product.price,
-        };
-      }
-
-      // check inventory
-      WarehouseAPI.getByWarehouseIdAndProductId(1, product.productId).then(
-        (data) => {
-          if (data.data[0].attributes.Quantity <= product.quantity) {
-            alert(
-              "Inventario insuficiente. Por favor, revise la disponibilidad."
-            );
-            return;
-          } else {
-            let updatedList = addedProductList.filter(
-              (x) => x.productId !== product.productId
-            );
-            updatedList = [...updatedList, product];
-            setAddedProductList(updatedList);
-          }
+        if (client.id !== "") {
+          price =
+            client.customerType === "Wholesale"
+              ? data.wholesalePrice
+              : data.retailPrice;
         }
-      );
-    } else {
-      ProductAPI.getProductByBarCode(formValues.productBarCode)
-        .then((data) => {
-          price = data.data[0].attributes.RetailPrice;
+        let product = {
+          id: Date.now(),
+          productId: data.id,
+          barCode: data.barCode,
+          name: data.name,
+          description: data.description,
+          price: price,
+        };
 
-          if (client.id !== "") {
-            price =
-              client.customerType === "Wholesale"
-                ? data.data[0].attributes.WholesalePrice
-                : data.data[0].attributes.RetailPrice;
-          }
-          product = {
-            id: data.data[0].id,
-            productId: data.data[0].id,
-            barCode: data.data[0].attributes.BarCode,
-            quantity: quantity,
-            name: data.data[0].attributes.Name,
-            description: data.data[0].attributes.Description,
-            price: price,
-            subtotal: quantity * price,
-          };
-
-          // check inventory
-          WarehouseAPI.getByWarehouseIdAndProductId(1, product.productId).then(
-            (data) => {
-              if (data.data[0].attributes.Quantity <= product.quantity) {
-                alert(
-                  "Inventario insuficiente. Por favor, revise la disponibilidad."
-                );
-                return;
-              } else {
-                setAddedProductList([...addedProductList, product]);
-              }
+        // check inventory
+        WarehouseAPI.getByWarehouseIdAndProductId(1, product.productId).then(
+          (data) => {
+            if (data.data[0].attributes.Quantity <= quantity + 1) {
+              alert(
+                "Inventario insuficiente. Por favor, revise la disponibilidad."
+              );
+              return;
+            } else {
+              setAddedProductList([...addedProductList, product]);
             }
-          );
-        })
-        .catch((err) => {
-          alert("No se pudo obtener los productos, por favor intenta de nueve");
-          console.error("No se pudo obtener los productos", err);
-        });
-    }
+          }
+        );
+      })
+      .catch((err) => {
+        alert("No se pudo obtener los productos, por favor intenta de nueve");
+        console.error("No se pudo obtener los productos", err);
+      });
 
     calculateTotal();
     clearFields();
@@ -506,38 +614,20 @@ const Invoices = () => {
   const deleteProduct = (_id) => {
     // lógica para borrar producto
     setAddedProductList(
-      addedProductList.filter((product) => product.productId !== _id)
+      addedProductList.filter((product) => product.id !== _id)
     );
-  };
-
-  const editProduct = (_id) => {
-    // lógica para editar producto
-    let data = addedProductList.find((x) => x.id === _id);
-    setFormValues({
-      ...formValues,
-      productBarCode: data.barCode,
-      quantity: data.quantity,
-    });
   };
 
   const clearFields = () => {
     setFormValues({
       ...formValues,
       productBarCode: "",
-      quantity: 1,
     });
   };
 
   const _columns = [
     { field: "id", headerName: "ID", flex: 1 },
     { field: "barCode", headerName: "Código", flex: 1 },
-    {
-      field: "quantity",
-      headerName: "Cantidad",
-      headerAlign: "center",
-      align: "center",
-      flex: 1,
-    },
     {
       field: "name",
       headerName: "Nombre",
@@ -564,54 +654,45 @@ const Invoices = () => {
       flex: 1,
     },
     {
-      field: "subtotal",
-      headerName: "Subtotal",
-      headerAlign: "center",
-      align: "center",
-      renderCell: ({ row: { subtotal } }) => {
-        return (
-          <Typography color={colors.greenAccent[500]}>
-            {currencyFormat.format(subtotal)}
-          </Typography>
-        );
-      },
-      flex: 1,
-    },
-    {
       field: "actions",
       type: "actions",
       getActions: (params) => [
         <GridActionsCellItem
-          icon={<EditOutlinedIcon />}
-          label="Editar"
-          onClick={() => editProduct(params.id)}
-          showInMenu
-          disabled={formValues.id === "" ? false : true}
-        />,
-        <GridActionsCellItem
           icon={<DeleteOutlineOutlinedIcon />}
           label="Borrar"
           onClick={() => deleteProduct(params.id)}
-          showInMenu
           disabled={formValues.id === "" ? false : true}
         />,
       ],
     },
   ];
 
-  const calculateTotal = () => {
+  const calculateTotal = (_data = undefined) => {
     let sum = 0;
-    addedProductList.forEach((invoice) => {
-      sum += invoice.subtotal;
-    });
 
-    if (formValues.discountId !== "") {
-      let discount =
-        discountList.find((x) => x.id === formValues.discountId).attributes
-          .DiscountPercentage / 100;
-      sum -= sum * discount;
+    if (_data !== undefined) {
+      _data.invoice_Products.forEach((invoice) => {
+        sum += invoice.price;
+      });
+      if (_data.discountId !== "") {
+        let discount =
+          discountList.find((x) => x.id === _data.discountId).attributes
+            .DiscountPercentage / 100;
+        sum -= sum * discount;
+      }
+    } else {
+      addedProductList.forEach((invoice) => {
+        sum += invoice.price;
+      });
+      if (formValues.discountId !== "") {
+        let discount =
+          discountList.find((x) => x.id === formValues.discountId).attributes
+            .DiscountPercentage / 100;
+        sum -= sum * discount;
+      }
     }
-    return sum;
+
+    return sum - formValues.creditNoteAppliedValue;
   };
 
   const calculateChange = () => {
@@ -744,6 +825,20 @@ const Invoices = () => {
           rows={addedProductList}
           columns={_columns}
           columnVisibilityModel={columnVisibilityModel}
+          disableSelectionOnClick
+          getRowClassName={(params) => {
+            return params.row.creditNoteNumber !== "" && formValues.id !== ""
+              ? "danger"
+              : "";
+          }}
+          sx={{
+            ".danger": {
+              bgcolor: `${colors.redAccent[700]}`,
+              "&:hover": {
+                bgcolor: `${colors.redAccent[800]}`,
+              },
+            },
+          }}
         />
         <Box>
           <Box
@@ -751,13 +846,41 @@ const Invoices = () => {
             p="15px"
             borderRadius="10px"
           >
-            <Box display={"flex"} alignItems={"center"} gap={2}>
+            <Box
+              display={"flex"}
+              alignItems={"center"}
+              justifyContent={"space-between"}
+            >
               <Typography
                 color={colors.blueAccent[500]}
                 sx={{ fontSize: "20px", fontWeight: "bold" }}
               >
                 Agregar Producto
               </Typography>
+              {formValues.id !== "" ? (
+                <IconButton
+                  type="button"
+                  onClick={handlePrintInvoice}
+                  disabled={formValues.status === "Canceled" ? true : false}
+                >
+                  <LocalPrintshopOutlinedIcon />
+                </IconButton>
+              ) : (
+                // <IconButton type="button" onClick={getCashCount}>
+                //   <PointOfSaleOutlinedIcon />
+                // </IconButton>
+                <CustomModal
+                  buttonIcon={<PointOfSaleOutlinedIcon />}
+                  onClick={getCashCount}
+                  open={openModal}
+                  setOpen={setOpenModal}
+                  message={{
+                    header: "Cierre de caja",
+                    body: "Estas seguro que deseas cerrar la caja?",
+                  }}
+                  onSubmit={handleSubmitModal}
+                />
+              )}
             </Box>
             <TextField
               id="txtProductBarCodde"
@@ -768,20 +891,7 @@ const Invoices = () => {
               variant="filled"
               value={formValues.productBarCode || ""}
               onChange={handleInputChange}
-              onKeyUp={(e) => addProduct(e, false)}
-              sx={{ marginTop: "15px" }}
-              inputProps={formValues.id !== "" ? { readOnly: true } : {}}
-            />
-            <TextField
-              id="txtQuantity"
-              name="quantity"
-              fullWidth
-              type="number"
-              label="Cantidad"
-              variant="filled"
-              value={formValues.quantity || ""}
-              onChange={handleInputChange}
-              onKeyUp={(e) => addProduct(e, true)}
+              onKeyUp={(e) => addProduct(e)}
               sx={{ marginTop: "15px" }}
               inputProps={formValues.id !== "" ? { readOnly: true } : {}}
             />
@@ -825,20 +935,6 @@ const Invoices = () => {
                   ))}
                 </Select>
               </FormControl>
-              {formValues.paymentMethodId === 1 && (
-                <TextField
-                  id="txtPaidWith"
-                  name="paidWith"
-                  fullWidth
-                  type="number"
-                  label="Pagar con"
-                  variant="filled"
-                  value={formValues.paidWith || ""}
-                  onChange={handleInputChange}
-                  sx={{ marginTop: "15px" }}
-                  inputProps={formValues.id !== "" ? { readOnly: true } : {}}
-                />
-              )}
               <FormControl
                 variant="filled"
                 sx={{ minWidth: 120, width: "100%", marginTop: "15px" }}
@@ -862,23 +958,112 @@ const Invoices = () => {
                   ))}
                 </Select>
               </FormControl>
+              <Box display={"flex"} alignItems={"center"} gap={"10px"}>
+                <TextField
+                  id="txtCreditNoteAppliedNumber"
+                  name="creditNoteAppliedNumber"
+                  type="text"
+                  label="NC #"
+                  variant="filled"
+                  value={formValues.creditNoteAppliedNumber || ""}
+                  onChange={handleInputChange}
+                  sx={{ marginTop: "15px" }}
+                  InputProps={
+                    formValues.id !== ""
+                      ? {
+                          readOnly: true,
+                          endAdornment: (
+                            <IconButton
+                              type="button"
+                              onClick={getCreditNoteByCreditNoteNumber}
+                              disabled
+                            >
+                              <Tooltip
+                                id="button-searchCreditNote"
+                                title="Buscar Nota de Crédito"
+                              >
+                                {formValues.creditNoteAppliedId !== "" ? (
+                                  <CheckCircleRoundedIcon />
+                                ) : (
+                                  <SearchIcon />
+                                )}
+                              </Tooltip>
+                            </IconButton>
+                          ),
+                        }
+                      : {
+                          endAdornment: (
+                            <IconButton
+                              type="button"
+                              onClick={getCreditNoteByCreditNoteNumber}
+                            >
+                              <Tooltip
+                                id="button-searchCreditNote"
+                                title="Buscar Nota de Crédito"
+                              >
+                                {formValues.creditNoteAppliedId !== "" ? (
+                                  <CancelIcon />
+                                ) : (
+                                  <SearchIcon />
+                                )}
+                              </Tooltip>
+                            </IconButton>
+                          ),
+                        }
+                  }
+                />
+                <Typography
+                  sx={{
+                    mt: "15px",
+                    fontWeight: "bold",
+                    fontSize: "25px",
+                    textAlign: "right",
+                  }}
+                >
+                  {currencyFormat.format(formValues.creditNoteAppliedValue)}
+                </Typography>
+              </Box>
+              {formValues.paymentMethodId === 1 && (
+                <TextField
+                  id="txtPaidWith"
+                  name="paidWith"
+                  fullWidth
+                  type="number"
+                  label="Pagar con"
+                  variant="filled"
+                  value={formValues.paidWith || ""}
+                  onChange={handleInputChange}
+                  sx={{ marginTop: "15px" }}
+                  inputProps={formValues.id !== "" ? { readOnly: true } : {}}
+                />
+              )}
               <Button
                 type="submit"
                 color={formValues.id === "" ? "secondary" : "error"}
                 variant="contained"
                 sx={{ width: "100%", marginTop: "15px" }}
-                disabled={formValues.status === "Canceled" ? true : false}
+                disabled={
+                  formValues.status === "Paid" || formValues.status === ""
+                    ? false
+                    : true
+                }
               >
                 {formValues.id === ""
                   ? "Pagar"
                   : formValues.status === "Paid"
                   ? "Anular"
-                  : "Anulada"}
+                  : formValues.status === "Canceled"
+                  ? "Anulada"
+                  : "Nota de Crédito Generada"}
               </Button>
             </form>
           </Box>
           <Box display={"none"}>
-            <Receipt ref={receiptRef} invoiceData={invoiceData} />
+            <InvoiceReceipt ref={invoiceReceiptRef} invoiceData={invoiceData} />
+            <CashCountReceipt
+              ref={cashCountReceiptRef}
+              cashCountData={cashCountData}
+            />
           </Box>
         </Box>
       </Box>

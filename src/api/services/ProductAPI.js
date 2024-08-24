@@ -63,11 +63,36 @@ export const ProductAPI = {
     },
     getProductByBarCode: function (_barCode) {
         return instance.request({
-        url: `/products?filters[BarCode][$eq]=${_barCode}&fields[0]=BarCode&fields[1]=Name&fields[2]=Description&fields[3]=RetailPrice&fields[4]=WholesalePrice`,
+        url: `/products?filters[BarCode][$eq]=${_barCode}&populate[Photos][fields][0]=url&populate[Photos][fields][1]=id&populate[Category][fields][0]=id&populate[Supplier][fields][0]=id`,
         method: 'GET',
         })
         .then(response => {
-            return response.data;
+            console.log(response.data.data)
+
+            let product = response.data.data[0]
+            let dimensionArray = product.attributes.Dimensions.split('x');
+            let length = dimensionArray[0] !== undefined ? dimensionArray[0] : '';
+            let width = dimensionArray[1] !== undefined ? dimensionArray[1] : '';
+            let height = dimensionArray[2] !== undefined ? dimensionArray[2] : '';
+            const data = {
+                id: product.id,
+                barCode: product.attributes.BarCode,
+                name: product.attributes.Name,
+                description: product.attributes.Description,
+                retailPrice: product.attributes.RetailPrice,
+                wholesalePrice: product.attributes.WholesalePrice,
+                minimumQuantity: product.attributes.MinimumQuantity,
+                weight: product.attributes.Weight === null ? '' : product.attributes.Weight,
+                warranty: product.attributes.Warranty !== null ? product.attributes.Warranty : "",
+                length: length, 
+                width: width,
+                height: height,
+                supplier: product.attributes.Supplier.data.id,
+                category: product.attributes.Category.data.id,
+                oldImageId: product.attributes.Photos?.data?.id ?? "",
+                oldImageUrl: product.attributes.Photos.data !== null ? `${process.env.REACT_APP_BASE_URL}${product.attributes.Photos.data.attributes.url}` : null
+            };
+            return data;
         })
         .catch(error => { throw error; });
     },
@@ -75,7 +100,7 @@ export const ProductAPI = {
     getProductById: function (_id) {
         return instance.request({
         
-        url: `/products/${_id}?populate[Photos][fields][0]=url&populate[Category][fields][0]=id&populate[Supplier][fields][0]=id`,
+        url: `/products/${_id}?populate[Photos][fields][0]=url&populate[Photos][fields][1]=id&populate[Category][fields][0]=id&populate[Supplier][fields][0]=id`,
         method: 'GET',
         })
         .then(response => {
@@ -92,22 +117,21 @@ export const ProductAPI = {
                 wholesalePrice: response.data.data.attributes.WholesalePrice,
                 minimumQuantity: response.data.data.attributes.MinimumQuantity,
                 weight: response.data.data.attributes.Weight === null ? '' : response.data.data.attributes.Weight,
+                warranty: response.data.data.attributes.Warranty !== null ? response.data.data.attributes.Warranty : "",
                 length: length, 
                 width: width,
                 height: height,
                 supplier: response.data.data.attributes.Supplier.data.id,
                 category: response.data.data.attributes.Category.data.id,
-                images: response.data.data.attributes.Photos.data !== null 
-                ? 
-                    response.data.data.attributes.Photos.data.map(photo => (`${process.env.REACT_APP_BASE_URL}${photo.attributes.url}`))
-                :
-                    [],
+                oldImageId: response.data.data.attributes.Photos?.data?.id ?? "",
+                oldImageUrl: response.data.data.attributes.Photos.data !== null ? `${process.env.REACT_APP_BASE_URL}${response.data.data.attributes.Photos.data.attributes.url}` : null
             };
             return data;
         })
         .catch(error => { throw error; });
     },
     create: function(_data) {
+        console.log(_data)
         let data = {
             'data': {
                 "BarCode": _data.barCode,
@@ -118,6 +142,7 @@ export const ProductAPI = {
                 "MinimumQuantity": _data.minimumQuantity,
                 "Weight": _data.weight !== '' ? _data.weight : null,
                 "Dimensions": `${_data.length}x${_data.width}x${_data.height}`,
+                "Warranty": _data.warranty !== '' ? _data.warranty : null,
                 "Active": true,
                 "Supplier": {
                     "id": _data.supplier
@@ -135,6 +160,33 @@ export const ProductAPI = {
         .then(response => response.data)
         .catch(error => { throw error; });
     },
+    uploadFile: function(file, productId) {
+        // Crear un objeto FormData para manejar el archivo
+        let formData = new FormData();
+        formData.append('files', file);
+        formData.append('ref', 'api::product.product'); // Nombre del modelo
+        formData.append('refId', productId); // ID de la orden de compra
+        formData.append('field', 'Photos'); // El nombre del campo de archivo en el modelo
+
+        return instance.request({
+            url: `/upload`,
+            method: 'POST',
+            data: formData,
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        })
+        .then(response => response.data)
+        .catch(error => { throw error; });
+    },
+    deleteFile: function(_fileId) {
+        return instance.request({
+            url: `/upload/files/${_fileId}`,
+            method: 'DELETE',
+        })
+        .then(response => response.data)
+        .catch(error => { throw error; });
+    },
     update: function(_data) {
         let data = {
             'data': {
@@ -146,6 +198,7 @@ export const ProductAPI = {
                 "MinimumQuantity": _data.minimumQuantity,
                 "Weight": _data.weight !== '' ? _data.weight : null,
                 "Dimensions": `${_data.length}x${_data.width}x${_data.height}`,
+                "Warranty": _data.warranty !== '' ? _data.warranty : null,
                 "Active": true,
                 "Supplier": {
                     "id": _data.supplier

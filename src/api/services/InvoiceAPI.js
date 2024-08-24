@@ -1,9 +1,24 @@
 import instance from '../axios';
 
 export const InvoiceAPI = {
+    getInvoiceTotalBetweenDate: function (_date1, _date2) {
+        return instance.request({
+        url: `/invoices?filters[createdAt][$gte]=${_date1}&filters[createdAt][$lt]=${_date2}&filters[Status][$ne]=Canceled&[fields]0]=Total&populate[Payment_Method][fields][0]=id&populate[Payment_Method][fields][1]=Name`,
+        method: 'GET',
+        })
+        .then(response => {
+            const dataList = response.data.data.map(invoice => ({
+                paymentMethodId: invoice.attributes.Payment_Method.data.id,
+                paymentMethodName: invoice.attributes.Payment_Method.data.attributes.Name,
+                total: invoice.attributes.Total
+            }))
+            return dataList;
+        })
+        .catch(error => { throw error; });
+    },
     getInvoiceByInvoiceNumber: function (_number) {
         return instance.request({
-        url: `/invoices?filters[InvoiceNumber][$eq]=${_number}&populate[Payment_Method][fields][0]=id&populate[Customer][fields][0]=id&populate[Customer][fields][1]=Identifier&populate[BilledBy][fields][0]=id&populate[Invoice_Discount][fields][0]=id&populate[Invoice_Products][fields][0]=Price&populate[Invoice_Products][fields][1]=Quantity&populate[Invoice_Products][populate][Product][fields][0]=id&populate[Invoice_Products][populate][Product][fields][1]=Name&populate[Invoice_Products][populate][Product][fields][2]=BarCode&populate[Invoice_Products][populate][Product][fields][3]=Description`,
+        url: `/invoices?populate[Payment_Method][fields][0]=id&filters[InvoiceNumber][$eq]=${_number}&populate[Customer][fields][0]=id&populate[Customer][fields][1]=Identifier&populate[BilledBy][fields][0]=id&populate[Invoice_Discount][fields][0]=id&populate[Invoice_Discount][fields][1]=DiscountPercentage&populate[CreditNoteApplied][fields][0]=CreditNoteNumber&populate[CreditNoteApplied][fields][1]=Total&populate[Invoice_Products][fields][0]=Price&populate[Invoice_Products][fields][1]=ReturnReason&populate[Invoice_Products][populate][CreditNote][fields][0]=CreditNoteNumber&populate[Invoice_Products][populate][Product][fields][0]=id&populate[Invoice_Products][populate][Product][fields][1]=Name&populate[Invoice_Products][populate][Product][fields][2]=BarCode&populate[Invoice_Products][populate][Product][fields][3]=Description&populate[Invoice_Products][populate][Product][fields][4]=Warranty`,
         method: 'GET',
         })
         .then(response => {
@@ -22,6 +37,10 @@ export const InvoiceAPI = {
                     paidWith: invoice.attributes.PaidWith,
                     returned: invoice.attributes.Returned,
                     status: invoice.attributes.Status,
+                    total: invoice.attributes.Total,
+                    createdAt: invoice.attributes.createdAt,
+                    creditNoteAppliedNumber: invoice.attributes.CreditNoteApplied.data !== null ? invoice.attributes.CreditNoteApplied.data.attributes.CreditNoteNumber : "",
+                    creditNoteAppliedValue: invoice.attributes.CreditNoteApplied.data !== null ? invoice.attributes.CreditNoteApplied.data.attributes.Total : 0,
                     paymentMethodId: invoice.attributes.Payment_Method.data.id,
                     customerId: invoice.attributes.Customer.data !== null ? invoice.attributes.Customer.data.id : '',
                     searchClientParam: invoice.attributes.Customer.data !== null ? invoice.attributes.Customer.data.attributes.Identifier : "",
@@ -31,11 +50,14 @@ export const InvoiceAPI = {
                         id: invoiceProduct.id,
                         productId: invoiceProduct.attributes.Product.data.id,
                         barCode: invoiceProduct.attributes.Product.data.attributes.BarCode,
-                        quantity: invoiceProduct.attributes.Quantity,
                         name: invoiceProduct.attributes.Product.data.attributes.Name,
                         description: invoiceProduct.attributes.Product.data.attributes.Description,
+                        warranty: invoiceProduct.attributes.Product.data.attributes.Warranty?? "",
+                        returnReason: invoiceProduct.attributes.ReturnReason !== null ? invoiceProduct.attributes.ReturnReason === "Warranty" ? "Garantía" : "Cambio" : "",
                         price: invoiceProduct.attributes.Price,
-                        subtotal: invoiceProduct.attributes.Quantity * invoiceProduct.attributes.Price,
+                        discount: invoice.attributes.Invoice_Discount.data !== null ? invoiceProduct.attributes.Price * (invoice.attributes.Invoice_Discount.data.attributes.DiscountPercentage/100) : 0,
+                        subtotal: invoice.attributes.Invoice_Discount.data !== null ? invoiceProduct.attributes.Price - invoiceProduct.attributes.Price * (invoice.attributes.Invoice_Discount.data.attributes.DiscountPercentage/100) : invoiceProduct.attributes.Price,
+                        creditNoteNumber: invoiceProduct.attributes.CreditNote.data !== null ? invoiceProduct.attributes.CreditNote.data.attributes.CreditNoteNumber : "",
                     }))
                 };
             }
@@ -54,6 +76,10 @@ export const InvoiceAPI = {
                 "RNC": _data.RNC,
                 "Note": _data.note,
                 "Status": _data.status,
+                "Total": _data.total,
+                "CreditNoteApplied": {
+                    "id": _data.creditNoteAppliedId,
+                },
                 "Payment_Method": {
                     "id": _data.paymentMethodId
                 },
@@ -69,6 +95,9 @@ export const InvoiceAPI = {
             }
         }
 
+        if (_data.creditNoteAppliedId === "") {
+            delete data.data.CreditNoteApplied;
+        }
         if (_data.customerId === "") {
             delete data.data.Customer;
         }
@@ -107,9 +136,8 @@ export const InvoiceAPI = {
         let data = {
             'data': {
                 "Price": _product.price,
-                "Quantity": _product.quantity,
                 "Product": {
-                    "id": _product.id
+                    "id": _product.productId
                 },
                 "Invoice": {
                     "id": _invoiceId

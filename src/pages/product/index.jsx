@@ -24,7 +24,7 @@ import { ProductAPI } from "../../api/services/ProductAPI";
 import { toPng } from "html-to-image";
 import DownloadIcon from "@mui/icons-material/Download";
 import CachedIcon from "@mui/icons-material/Cached";
-import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import UploadIcon from "@mui/icons-material/Upload";
 
 const Product = () => {
   const { id } = useParams();
@@ -47,9 +47,13 @@ const Product = () => {
     height: "",
     supplier: "",
     category: "",
+    warranty: "",
+    searchProductParam: "",
+    oldImageId: "",
   });
 
-  const [images, setImages] = useState([]);
+  const [image, setImage] = useState(null);
+  const [preview, setPreview] = useState(null);
   const [supplierList, setSupplierList] = useState([]);
   const [categoryList, setCategoryList] = useState([]);
   const [productOldName, setProductOldName] = useState("");
@@ -66,28 +70,25 @@ const Product = () => {
     if (id !== undefined) {
       ProductAPI.getProductById(id)
         .then((response) => {
-          const product = response;
-          setFormValues({
-            id: id,
-            barCode: product.barCode,
-            name: product.name,
-            description: product.description,
-            retailPrice: product.retailPrice,
-            wholesalePrice: product.wholesalePrice,
-            minimumQuantity: product.minimumQuantity,
-            weight: product.weight,
-            length: product.length,
-            width: product.width,
-            height: product.height,
-            supplier: product.supplier,
-            category: product.category,
-          });
-          setImages(product.images);
-          setProductOldName(product.name);
+          setFormValues(response);
+          setPreview(response.oldImageUrl);
+          setProductOldName(response.name);
         })
         .catch((err) => console.error("No se pudo obtener el producto", err));
     }
   }, [id]);
+
+  const getProductByBarCode = () => {
+    ProductAPI.getProductByBarCode(formValues.searchProductParam)
+      .then((response) => {
+        setFormValues(response);
+        setPreview(response.oldImageUrl);
+        setProductOldName(response.name);
+      })
+      .catch((err) =>
+        console.log("No se pudo obtener el orden de compra", err)
+      );
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -122,26 +123,21 @@ const Product = () => {
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
     const imageFiles = files.map((file) => URL.createObjectURL(file));
-    setImages([...images, ...imageFiles]); // Asegurarse de agregar las nuevas imágenes a las existentes
-  };
-
-  const handleImageDelete = (imageToDelete) => {
-    setImages(images.filter((image) => image !== imageToDelete));
+    if (imageFiles.length > 0) {
+      setPreview(imageFiles[0]);
+      setImage(e.target.files[0]);
+    }
   };
 
   const handleFormSubmit = (e) => {
     e.preventDefault();
-    if (id) {
-      // Editar producto
-      ProductAPI.update(formValues)
-        .then(() => {
-          alert("Producto actualizado exitosamente");
-        })
-        .catch((err) => alert("No se pudo actualizar el producto", err));
-    } else {
+    if (formValues.id === "") {
       // Crear producto
       ProductAPI.create(formValues)
         .then((data) => {
+          if (image !== null) {
+            ProductAPI.uploadFile(image, data.data.id);
+          }
           alert("Producto creado exitosamente");
           setFormValues({
             ...formValues,
@@ -151,6 +147,19 @@ const Product = () => {
           setProductOldName(formValues.name);
         })
         .catch((err) => alert("No se pudo crear el producto", err));
+    } else {
+      // Editar producto
+      ProductAPI.update(formValues)
+        .then((data) => {
+          if (image !== null) {
+            if (formValues.oldImageId !== "") {
+              ProductAPI.deleteFile(formValues.oldImageId);
+            }
+            ProductAPI.uploadFile(image, data.data.id);
+          }
+          alert("Producto actualizado exitosamente");
+        })
+        .catch((err) => alert("No se pudo actualizar el producto", err));
     }
   };
 
@@ -191,8 +200,14 @@ const Product = () => {
           p={0.2}
           borderRadius={2}
         >
-          <InputBase sx={{ ml: 1, flex: 1 }} placeholder="Buscar producto" />
-          <IconButton type="button">
+          <InputBase
+            sx={{ ml: 1, flex: 1 }}
+            name="searchProductParam"
+            placeholder="Buscar orden"
+            onChange={handleInputChange}
+            value={formValues.searchProductParam || ""}
+          />
+          <IconButton type="button" onClick={getProductByBarCode}>
             <SearchIcon />
           </IconButton>
         </Box>
@@ -238,100 +253,131 @@ const Product = () => {
         >
           <form onSubmit={handleFormSubmit}>
             <Box display="grid" gap="30px" gridTemplateColumns="1fr 1fr">
-              {formValues.barCode ? (
-                <Box display={"flex"} alignItems={"center"} gap={2}>
-                  <Box ref={barcodeRef}>
-                    <Barcode value={formValues.barCode} />
-                  </Box>
-                  <IconButton type="button" onClick={handleDownloadBarcode}>
-                    <Tooltip
-                      id="button-download"
-                      title="Descargar código de barra"
-                    >
-                      <DownloadIcon />
-                    </Tooltip>
-                  </IconButton>
-                </Box>
-              ) : (
-                <Box></Box>
-              )}
-              <Box>
-                {images.length > 0 && (
-                  <Box mb={2}>
-                    <Typography>Vista previa de fotos:</Typography>
-                    <Box display="flex" flexWrap="wrap" gap="10px">
-                      {images.map((image, index) => (
-                        <Box
-                          key={index}
-                          position="relative"
-                          width="100px"
-                          height="100px"
-                          sx={{
-                            "&:hover .delete-icon": {
-                              display: "block",
-                            },
-                          }}
-                        >
-                          <img
-                            src={image}
-                            alt={`product-${index}`}
-                            width="100"
-                            height="100"
-                          />
-                          <IconButton
-                            onClick={() => handleImageDelete(image)}
-                            className="delete-icon"
-                            sx={{
-                              display: "none",
-                              position: "absolute",
-                              top: 0,
-                              right: 0,
-                              backgroundColor: "transparent",
-                              "&:hover": {
-                                backgroundColor: "transparent",
-                              },
-                            }}
-                          >
-                            <DeleteOutlineOutlinedIcon
-                              fontSize="small"
-                              color="warning"
-                            />
-                          </IconButton>
-                        </Box>
-                      ))}
+              <Box
+                display={"flex"}
+                justifyContent={"space-between"}
+                alignItems={"center"}
+              >
+                {formValues.barCode && (
+                  <Box
+                    display={"flex"}
+                    alignItems={"center"}
+                    sx={{
+                      border: 3,
+                      borderColor: "white",
+                      borderRadius: "16px",
+                    }}
+                  >
+                    <Box padding={"7px 0px 0px 7px"} ref={barcodeRef}>
+                      <Barcode value={formValues.barCode} />
                     </Box>
+                    <IconButton type="button" onClick={handleDownloadBarcode}>
+                      <Tooltip
+                        id="button-download"
+                        title="Descargar código de barra"
+                      >
+                        <DownloadIcon />
+                      </Tooltip>
+                    </IconButton>
                   </Box>
                 )}
-                <input
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  id="upload-photo"
-                  multiple
-                  type="file"
-                  onChange={handleImageUpload}
-                />
-                <label htmlFor="upload-photo">
-                  <Button variant="contained" color="info" component="span">
-                    Subir Fotos
-                  </Button>
-                </label>
+                <Box
+                  display={"flex"}
+                  alignItems={"center"}
+                  sx={{
+                    border: 3,
+                    borderColor: "white",
+                    borderRadius: "16px",
+                  }}
+                >
+                  <Box>
+                    <Box
+                      display="flex"
+                      flexWrap="wrap"
+                      gap="10px"
+                      padding={"5px 0px 5px 5px"}
+                    >
+                      <img
+                        src={
+                          preview !== null
+                            ? preview
+                            : "../../assets/no_photo.jpg"
+                        }
+                        alt={`product-${formValues.barCode}`}
+                        width="150"
+                        height="150"
+                      />
+                    </Box>
+                  </Box>
+                  <input
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    id="upload-photo"
+                    multiple
+                    type="file"
+                    onChange={handleImageUpload}
+                  />
+                  <label htmlFor="upload-photo">
+                    <IconButton type="button" component="span">
+                      <Tooltip id="button-upload" title="Subir foto">
+                        <UploadIcon />
+                      </Tooltip>
+                    </IconButton>
+                  </label>
+                </Box>
               </Box>
-              <Box display="grid" gridTemplateColumns="10fr 1fr" gap={1}>
-                <TextField
-                  variant="filled"
-                  label="Código de Barras"
-                  name="barCode"
-                  value={formValues.barCode}
-                  onChange={handleInputChange}
-                  inputProps={formValues.id !== "" ? { readOnly: true } : {}}
-                  required
-                />
-                <IconButton type="button" onClick={handleBarCodeGenerate}>
-                  <Tooltip id="button-generate" title="Generar código de barra">
-                    <CachedIcon />
-                  </Tooltip>
-                </IconButton>
-              </Box>
+              <TextField
+                variant="filled"
+                label="Descripción"
+                name="description"
+                value={formValues.description}
+                onChange={handleInputChange}
+                multiline
+                rows={7}
+                required
+              />
+              <TextField
+                variant="filled"
+                label="Código de Barras"
+                name="barCode"
+                value={formValues.barCode}
+                onChange={handleInputChange}
+                InputProps={
+                  formValues.id !== ""
+                    ? {
+                        readOnly: true,
+                        endAdornment: (
+                          <IconButton
+                            type="button"
+                            onClick={handleBarCodeGenerate}
+                          >
+                            <Tooltip
+                              id="button-generate"
+                              title="Generar código de barra"
+                            >
+                              <CachedIcon />
+                            </Tooltip>
+                          </IconButton>
+                        ),
+                      }
+                    : {
+                        endAdornment: (
+                          <IconButton
+                            type="button"
+                            onClick={handleBarCodeGenerate}
+                          >
+                            <Tooltip
+                              id="button-generate"
+                              title="Generar código de barra"
+                            >
+                              <CachedIcon />
+                            </Tooltip>
+                          </IconButton>
+                        ),
+                      }
+                }
+                required
+              />
               <TextField
                 variant="filled"
                 label="Nombre"
@@ -340,41 +386,54 @@ const Product = () => {
                 onChange={handleInputChange}
                 required
               />
-              <TextField
-                variant="filled"
-                label="Descripción"
-                name="description"
-                value={formValues.description}
-                onChange={handleInputChange}
-                required
-              />
-              <TextField
-                variant="filled"
-                type="number"
-                label="Cantidad Mínima"
-                name="minimumQuantity"
-                value={formValues.minimumQuantity}
-                onChange={handleInputChange}
-                required
-              />
-              <TextField
-                variant="filled"
-                type="number"
-                label="Precio al por menor"
-                name="retailPrice"
-                value={formValues.retailPrice}
-                onChange={handleInputChange}
-                required
-              />
-              <TextField
-                variant="filled"
-                type="number"
-                label="Precio al por mayor"
-                name="wholesalePrice"
-                value={formValues.wholesalePrice}
-                onChange={handleInputChange}
-                required
-              />
+              <Box
+                display={"grid"}
+                gridTemplateColumns={"1fr 1fr"}
+                gap={"30px"}
+              >
+                <TextField
+                  variant="filled"
+                  type="number"
+                  label="Cantidad Mínima"
+                  name="minimumQuantity"
+                  value={formValues.minimumQuantity}
+                  onChange={handleInputChange}
+                  required
+                />
+                <TextField
+                  variant="filled"
+                  type="number"
+                  label="Garantía (meses)"
+                  name="warranty"
+                  value={formValues.warranty}
+                  onChange={handleInputChange}
+                />
+              </Box>
+              <Box
+                display={"grid"}
+                gridTemplateColumns={"1fr 1fr"}
+                gap={"30px"}
+              >
+                <TextField
+                  variant="filled"
+                  type="number"
+                  label="Precio al por menor"
+                  name="retailPrice"
+                  value={formValues.retailPrice}
+                  onChange={handleInputChange}
+                  required
+                />
+                <TextField
+                  variant="filled"
+                  type="number"
+                  label="Precio al por mayor"
+                  name="wholesalePrice"
+                  value={formValues.wholesalePrice}
+                  onChange={handleInputChange}
+                  required
+                />
+              </Box>
+
               <FormControl
                 variant="filled"
                 sx={{ minWidth: 120, width: "100%" }}

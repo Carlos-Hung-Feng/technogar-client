@@ -2,7 +2,7 @@ import React from "react";
 import { Box, Typography } from "@mui/material";
 import Barcode from "react-barcode";
 
-const Receipt = React.forwardRef(({ invoiceData }, ref) => {
+const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
   if (!invoiceData) {
     return null; // Maneja el caso en que no se haya pasado invoiceData
   }
@@ -11,12 +11,12 @@ const Receipt = React.forwardRef(({ invoiceData }, ref) => {
     <Box
       p={3}
       style={{
-        width: "48mm",
+        width: "49mm",
         height: "auto",
         backgroundColor: "#fff",
         fontFamily: "monospace",
         color: "black",
-        padding: "15px 0px",
+        padding: "0px",
       }}
       ref={ref}
       className="receipt"
@@ -32,13 +32,15 @@ const Receipt = React.forwardRef(({ invoiceData }, ref) => {
       </Box>
 
       <Typography align="center">
-        ------------------------------------------
+        -------------------------------------------
       </Typography>
 
       <Typography fontWeight={"bold"}>
         Factura #: {invoiceData.invoiceNumber}
       </Typography>
-      <Typography>{new Date().toLocaleString() + ""}</Typography>
+      <Typography>
+        {new Date(invoiceData.createdAt).toLocaleString()}
+      </Typography>
       {invoiceData.clientName && (
         <Typography>Cliente: {invoiceData.clientName}</Typography>
       )}
@@ -46,44 +48,42 @@ const Receipt = React.forwardRef(({ invoiceData }, ref) => {
         <Typography>RNC: {invoiceData.clientRNC}</Typography>
       )}
       <Typography align="center">
-        ------------------------------------------
+        -------------------------------------------
       </Typography>
       <Typography align="center" fontWeight={"bold"} fontSize={"13px"}>
         Factura para{" "}
         {invoiceData.clientRNC !== "" ? "Credito Fiscal" : "Consumidor Final"}
       </Typography>
       <Typography align="center">
-        ------------------------------------------
+        -------------------------------------------
       </Typography>
       <Box display={"grid"} gridTemplateColumns={"1fr 2fr 1fr"}>
         <Typography>Cant.</Typography>
         <Typography align="center">ITBIS</Typography>
-        <Typography align="right">Valor{invoiceData.clientRNC}</Typography>
+        <Typography align="right">Valor</Typography>
       </Box>
       <Typography align="center">
-        ------------------------------------------
+        -------------------------------------------
       </Typography>
       {invoiceData.products.map((product, index) => (
         <Box key={index}>
           <Typography fontWeight={"bold"} fontSize={"11px"}>
             {product.barCode} - {product.name}
           </Typography>
-          <Box display={"grid"} gridTemplateColumns={"1fr 2fr 1fr"}>
-            <Typography fontSize={"11px"}>
-              {product.quantity}x
-              {product.price.toLocaleString("en", { minimumFractionDigits: 2 })}
+          {product.warranty && (
+            <Typography fontWeight={"bold"} fontSize={"11px"}>
+              Meses de garantía: {product.warranty}
             </Typography>
+          )}
+          <Box display={"grid"} gridTemplateColumns={"1fr 2fr 1fr"}>
+            <Typography fontSize={"11px"}>1.00</Typography>
             <Typography align="center" fontSize={"11px"}>
               {(
-                Math.round(
-                  (product.price * product.quantity -
-                    (product.price * product.quantity) / 1.18) *
-                    100
-                ) / 100
+                Math.round((product.price - product.price / 1.18) * 100) / 100
               ).toLocaleString("en", { minimumFractionDigits: 2 })}
             </Typography>
             <Typography align="right" fontSize={"11px"}>
-              {(product.price * product.quantity).toLocaleString("en", {
+              {product.price.toLocaleString("en", {
                 minimumFractionDigits: 2,
               })}
             </Typography>
@@ -91,7 +91,7 @@ const Receipt = React.forwardRef(({ invoiceData }, ref) => {
         </Box>
       ))}
       <Typography align="center">
-        ------------------------------------------
+        -------------------------------------------
       </Typography>
       <Box display={"flex"} justifyContent={"space-between"}>
         <Typography>Subtotal:</Typography>
@@ -103,9 +103,25 @@ const Receipt = React.forwardRef(({ invoiceData }, ref) => {
       </Box>
       {invoiceData.discount > 0 && (
         <Box display={"flex"} justifyContent={"space-between"}>
-          <Typography>Descuento:</Typography>
           <Typography>
+            Descuento&#40;{invoiceData.discountPersentage}%&#41;:
+          </Typography>
+          <Typography>
+            -
             {invoiceData.discount.toLocaleString("en", {
+              minimumFractionDigits: 2,
+            })}
+          </Typography>
+        </Box>
+      )}
+      {invoiceData.creditNoteAppliedValue > 0 && (
+        <Box display={"flex"} justifyContent={"space-between"}>
+          <Typography>
+            NC &#40;{invoiceData.creditNoteAppliedNumber}&#41;:
+          </Typography>
+          <Typography>
+            -
+            {invoiceData.creditNoteAppliedValue.toLocaleString("en", {
               minimumFractionDigits: 2,
             })}
           </Typography>
@@ -134,16 +150,25 @@ const Receipt = React.forwardRef(({ invoiceData }, ref) => {
         </Typography>
       </Box>
       <Typography align="center">
-        ------------------------------------------
+        -------------------------------------------
       </Typography>
       <Barcode
         value={invoiceData.invoiceNumber}
         height={40}
         displayValue={false}
       />
-      <Typography align="center">¡Gracias por su compra!</Typography>
+      <Typography fontSize={"10px"}>
+        Para cualquier reclamación de garantía, es indispensable presentar el
+        producto con su caja original y el recibo de compra.
+      </Typography>
+      <Typography fontWeight={"bold"} align="center" mt={1}>
+        ¡Gracias por elegirnos!
+      </Typography>
+      <Typography align="center">
+        -------------------------------------------
+      </Typography>
     </Box>
   );
 });
 
-export default Receipt;
+export default InvoiceReceipt;

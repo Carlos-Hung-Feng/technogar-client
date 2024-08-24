@@ -13,7 +13,7 @@ import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
 import AddShoppingCartOutlinedIcon from "@mui/icons-material/AddShoppingCartOutlined";
 import InventoryOutlinedIcon from "@mui/icons-material/InventoryOutlined";
 import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
-import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import LocalAtmOutlinedIcon from "@mui/icons-material/LocalAtmOutlined";
 
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
@@ -160,6 +160,14 @@ const MyProSidebar = () => {
               title="Facturar"
               to="/"
               icon={<ReceiptOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+
+            <Item
+              title="Nota de Crédito"
+              to="/credit-note"
+              icon={<LocalAtmOutlinedIcon />}
               selected={selected}
               setSelected={setSelected}
             />

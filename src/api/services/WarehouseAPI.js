@@ -25,7 +25,7 @@ export const WarehouseAPI = {
         .then(response => response.data)
         .catch(error => { throw error; });
     },
-    create: function(_data) {
+    createInventory: function(_data) {
         let data = {
             'data': {
                 "Quantity": _data.quantity,
@@ -45,17 +45,11 @@ export const WarehouseAPI = {
         .then(response => response.data)
         .catch(error => { throw error; });
     },
-    update: function(_data) {
+    updateInventory: function(_data) {
         console.log(_data);
         let data = {
             'data': {
-                "Quantity": _data.quantity,
-                "Warehouse": {
-                    "id": _data.warehouse
-                },
-                "Product": {
-                    "id": _data.product
-                }
+                "Quantity": _data.quantity
             }
         }
         return instance.request({

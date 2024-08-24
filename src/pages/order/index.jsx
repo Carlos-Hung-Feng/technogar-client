@@ -32,7 +32,7 @@ import { Link } from "react-router-dom";
 const Order = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const userId = localStorage.getItem("userId"); // Obtener el token del almacenamiento local
+  const userId = localStorage.getItem("userId");
 
   const [paymentMethodList, setPaymentMethodList] = useState([]);
   const [supplierList, setSupplierList] = useState([]);
@@ -123,6 +123,7 @@ const Order = () => {
 
     if (e.target.type === "file") {
       // Si es un archivo, guardarlo como parte del estado
+      console.log(e.target.files[0]);
       setFile(e.target.files[0]);
     }
 
@@ -213,14 +214,14 @@ const Order = () => {
                 parseInt(warehouse.data[0].attributes.Quantity) +
                 parseInt(_orderProduct.quantity),
             };
-            WarehouseAPI.update(inventory);
+            WarehouseAPI.updateInventory(inventory);
           } else {
             let inventory = {
               warehouse: _warehouseId,
               product: _orderProduct.productId,
               quantity: _orderProduct.quantity,
             };
-            WarehouseAPI.create(inventory);
+            WarehouseAPI.createInventory(inventory);
           }
         });
       }
@@ -684,7 +685,7 @@ const Order = () => {
             >
               {formValues.id !== "" ? (
                 <Typography
-                  variant="h5"
+                  variant="h4"
                   color={colors.greenAccent[500]}
                   sx={{ mb: 2 }}
                 >
@@ -692,7 +693,7 @@ const Order = () => {
                 </Typography>
               ) : (
                 <Typography
-                  variant="h5"
+                  variant="h4"
                   color={colors.greenAccent[500]}
                   sx={{ mb: 2 }}
                 >
