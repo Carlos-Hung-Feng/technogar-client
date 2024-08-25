@@ -170,8 +170,7 @@ const Invoices = () => {
         ? tomorrow.getMonth() + 1
         : "0" + (tomorrow.getMonth() + 1)
     }-${tomorrow.getDate()}`;
-    //InvoiceAPI.getInvoiceTotalBetweenDate(todayString, tomorrowString).then(
-    InvoiceAPI.getInvoiceTotalBetweenDate("2024-08-01", "2024-08-25").then(
+    InvoiceAPI.getInvoiceTotalBetweenDate(todayString, tomorrowString).then(
       (data) => {
         const invoiceGroupedByPaymentJson = Object.groupBy(
           data,
@@ -866,9 +865,6 @@ const Invoices = () => {
                   <LocalPrintshopOutlinedIcon />
                 </IconButton>
               ) : (
-                // <IconButton type="button" onClick={getCashCount}>
-                //   <PointOfSaleOutlinedIcon />
-                // </IconButton>
                 <CustomModal
                   buttonIcon={<PointOfSaleOutlinedIcon />}
                   onClick={getCashCount}
