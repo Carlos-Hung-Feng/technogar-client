@@ -1,9 +1,9 @@
 import instance from '../axios';
 
 export const InvoiceAPI = {
-    getInvoiceTotalBetweenDate: function (_date1, _date2) {
+    getInvoiceTotal: function (_today) {
         return instance.request({
-        url: `/invoices?filters[createdAt][$gte]=${_date1}&filters[createdAt][$lt]=${_date2}&filters[Status][$ne]=Canceled&[fields]0]=Total&populate[Payment_Method][fields][0]=id&populate[Payment_Method][fields][1]=Name`,
+        url: `/invoices?filters[createdAt][$gte]=${_today}&filters[Status][$ne]=Canceled&[fields]0]=Total&populate[Payment_Method][fields][0]=id&populate[Payment_Method][fields][1]=Name`,
         method: 'GET',
         })
         .then(response => {
@@ -12,6 +12,7 @@ export const InvoiceAPI = {
                 paymentMethodName: invoice.attributes.Payment_Method.data.attributes.Name,
                 total: invoice.attributes.Total
             }))
+            console.log(dataList);
             return dataList;
         })
         .catch(error => { throw error; });

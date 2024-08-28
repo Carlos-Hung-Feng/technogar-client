@@ -93,14 +93,17 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
       <Typography align="center">
         -------------------------------------------
       </Typography>
-      <Box display={"flex"} justifyContent={"space-between"}>
-        <Typography>Subtotal:</Typography>
-        <Typography>
-          {invoiceData.subtotal.toLocaleString("en", {
-            minimumFractionDigits: 2,
-          })}
-        </Typography>
-      </Box>
+      {invoiceData.subtotal !== invoiceData.total && (
+        <Box display={"flex"} justifyContent={"space-between"}>
+          <Typography>Subtotal:</Typography>
+          <Typography>
+            {invoiceData.subtotal.toLocaleString("en", {
+              minimumFractionDigits: 2,
+            })}
+          </Typography>
+        </Box>
+      )}
+
       {invoiceData.discount > 0 && (
         <Box display={"flex"} justifyContent={"space-between"}>
           <Typography>

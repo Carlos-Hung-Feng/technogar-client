@@ -151,7 +151,7 @@ const Customer = () => {
         >
           <InputBase
             sx={{ ml: 1, flex: 1 }}
-            placeholder="Buscar cliente"
+            placeholder="Buscar con RNC / Cédula"
             onChange={handleInputChange}
             name="searchClientParam"
             value={formValues.searchClientParam || ""}
@@ -232,7 +232,7 @@ const Customer = () => {
               <TextField
                 variant="filled"
                 type="text"
-                label="# de Identificación"
+                label='RNC / Cédula (sin guión "-")'
                 onChange={handleInputChange}
                 name="identifier"
                 value={formValues.identifier || ""}

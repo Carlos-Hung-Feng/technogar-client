@@ -163,48 +163,39 @@ const Invoices = () => {
         ? today.getMonth() + 1
         : "0" + (today.getMonth() + 1)
     }-${today.getDate()}`;
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-    let tomorrowString = `${tomorrow.getFullYear()}-${
-      tomorrow.getMonth() + 1 > 9
-        ? tomorrow.getMonth() + 1
-        : "0" + (tomorrow.getMonth() + 1)
-    }-${tomorrow.getDate()}`;
-    InvoiceAPI.getInvoiceTotalBetweenDate(todayString, tomorrowString).then(
-      (data) => {
-        const invoiceGroupedByPaymentJson = Object.groupBy(
-          data,
-          ({ paymentMethodId }) => paymentMethodId
-        );
-        let cashCountList = [];
-        let total = 0;
+    InvoiceAPI.getInvoiceTotal(todayString).then((data) => {
+      const invoiceGroupedByPaymentJson = Object.groupBy(
+        data,
+        ({ paymentMethodId }) => paymentMethodId
+      );
+      let cashCountList = [];
+      let total = 0;
 
-        for (let i in invoiceGroupedByPaymentJson) {
-          let paymentMethodName =
-            invoiceGroupedByPaymentJson[i][0].paymentMethodName;
-          let invoiceCount = invoiceGroupedByPaymentJson[i].length;
-          let sum = 0;
+      for (let i in invoiceGroupedByPaymentJson) {
+        let paymentMethodName =
+          invoiceGroupedByPaymentJson[i][0].paymentMethodName;
+        let invoiceCount = invoiceGroupedByPaymentJson[i].length;
+        let sum = 0;
 
-          invoiceGroupedByPaymentJson[i].forEach((invoice) => {
-            sum += invoice.total;
-          });
-
-          total += sum;
-
-          let data = {
-            paymentMethodName: paymentMethodName,
-            count: invoiceCount,
-            subtotal: sum,
-          };
-
-          cashCountList.push(data);
-        }
-        setCashCountData({
-          total: total,
-          invoiceCount: cashCountList,
+        invoiceGroupedByPaymentJson[i].forEach((invoice) => {
+          sum += invoice.total;
         });
+
+        total += sum;
+
+        let data = {
+          paymentMethodName: paymentMethodName,
+          count: invoiceCount,
+          subtotal: sum,
+        };
+
+        cashCountList.push(data);
       }
-    );
+      setCashCountData({
+        total: total,
+        invoiceCount: cashCountList,
+      });
+    });
     setOpenModal(true);
     //handlePrintCashCount();
   };
@@ -258,6 +249,11 @@ const Invoices = () => {
         paidWith: total,
         returned: 0,
       };
+    }
+
+    if (data.returned < 0) {
+      alert("Balance no suficiente.");
+      return;
     }
 
     await generateReceipt(data);
@@ -360,8 +356,12 @@ const Invoices = () => {
       });
     }
 
-    let discount = discountList.find((x) => x.id === _data.discountId)
-      .attributes.DiscountPercentage;
+    let discount = 0;
+
+    if (_data.discountId !== "") {
+      discount = discountList.find((x) => x.id === _data.discountId).attributes
+        .DiscountPercentage;
+    }
 
     const newInvoiceData = {
       invoiceNumber: _data.invoiceNumber,

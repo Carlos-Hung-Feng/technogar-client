@@ -417,7 +417,7 @@ const Product = () => {
                 <TextField
                   variant="filled"
                   type="number"
-                  label="Precio al por menor"
+                  label="Precio al detalle"
                   name="retailPrice"
                   value={formValues.retailPrice}
                   onChange={handleInputChange}

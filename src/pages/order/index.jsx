@@ -58,9 +58,9 @@ const Order = () => {
     supplier: "",
     telephone: "",
     paymentMethod: "",
-    tax: "",
+    tax: 0,
     warehouse: "",
-    freight: "",
+    freight: 0,
     documentName: "",
     shippingAddress: "",
     note: "",
@@ -127,17 +127,27 @@ const Order = () => {
       setFile(e.target.files[0]);
     }
 
-    setFormValues({
-      ...formValues,
-      [name]: value,
-    });
-
+    let supplierPhoneNumber = "";
     if (name === "supplier") {
       setFilteredProductBasicInfoList(
         productBasicInfoList.filter((x) => x.supplierId === value)
       );
-
+      supplierPhoneNumber = supplierList.find((x) => x.id === value).attributes
+        .Telephone;
       setAddedProductList([]);
+    }
+
+    if (supplierPhoneNumber !== "") {
+      setFormValues({
+        ...formValues,
+        [name]: value,
+        telephone: supplierPhoneNumber,
+      });
+    } else {
+      setFormValues({
+        ...formValues,
+        [name]: value,
+      });
     }
   };
 
@@ -232,6 +242,9 @@ const Order = () => {
     PurchaseOrderAPI.getOrderByOrderNumber(formValues.searchPurchaseOrderParam)
       .then((response) => {
         setFormValues(response);
+        setFilteredProductBasicInfoList(
+          productBasicInfoList.filter((x) => x.supplierId === response.supplier)
+        );
         setAddedProductList(response.purchaseOrder_Products);
       })
       .catch((err) =>
@@ -520,7 +533,7 @@ const Order = () => {
                   variant="filled"
                   sx={{ minWidth: 120, width: "100%" }}
                 >
-                  <InputLabel id="lblPaymentMethod">Método de Pago</InputLabel>
+                  <InputLabel id="lblPaymentMethod">Método de Pago*</InputLabel>
                   <Select
                     labelId="lblPaymentMethod"
                     id="sltPaymentMethod"
@@ -540,7 +553,7 @@ const Order = () => {
                   variant="filled"
                   sx={{ minWidth: 120, width: "100%" }}
                 >
-                  <InputLabel id="lblSupplier">Proveedor</InputLabel>
+                  <InputLabel id="lblSupplier">Proveedor*</InputLabel>
                   <Select
                     labelId="lblSupplier"
                     id="sltSupplier"
@@ -574,6 +587,7 @@ const Order = () => {
                   value={formValues.shippingAddress || ""}
                   multiline
                   rows={5}
+                  required
                 />
                 <TextField
                   variant="filled"
@@ -598,7 +612,7 @@ const Order = () => {
                     label="Impuesto"
                     onChange={handleInputChange}
                     name="tax"
-                    value={formValues.tax || ""}
+                    value={formValues.tax || 0}
                   />
                   <TextField
                     variant="filled"
@@ -606,13 +620,13 @@ const Order = () => {
                     label="Flete"
                     onChange={handleInputChange}
                     name="freight"
-                    value={formValues.freight || ""}
+                    value={formValues.freight || 0}
                   />
                   <FormControl
                     variant="filled"
                     sx={{ minWidth: 120, width: "100%" }}
                   >
-                    <InputLabel id="lblWarehouse">Almacén</InputLabel>
+                    <InputLabel id="lblWarehouse">Almacén*</InputLabel>
                     <Select
                       labelId="lblWarehouse"
                       id="sltWarehouse"
@@ -646,7 +660,7 @@ const Order = () => {
                     variant="filled"
                     sx={{ minWidth: 120, width: "100%" }}
                   >
-                    <InputLabel id="lblOrderedBy">Ordenado Por</InputLabel>
+                    <InputLabel id="lblOrderedBy">Ordenado Por*</InputLabel>
                     <Select
                       labelId="lblOrderedBy"
                       id="sltOrderedBy"
@@ -673,6 +687,7 @@ const Order = () => {
                     name="orderedDate"
                     value={formValues.orderedDate || ""}
                     InputLabelProps={{ shrink: true }}
+                    required
                   />
                 </Box>
               </Box>
@@ -706,7 +721,7 @@ const Order = () => {
                 gap={"30px"}
                 gridTemplateColumns="repeat(12, 1fr)"
               >
-                <Box gridColumn="span 6">
+                <Box gridColumn="span 3">
                   <Autocomplete
                     options={filteredProductBasicInfoList}
                     getOptionLabel={(option) =>
@@ -752,7 +767,7 @@ const Order = () => {
                   />
                 </Box>
                 <Box
-                  gridColumn="span 12"
+                  gridColumn="span 3"
                   display={"flex"}
                   justifyContent={"flex-end"}
                 >
@@ -762,6 +777,12 @@ const Order = () => {
                         ? "info"
                         : "warning"
                     }
+                    disabled={
+                      formValues.product === null ||
+                      formValues.quantity === "0" ||
+                      formValues.quantity === "" ||
+                      formValues.cost === ""
+                    }
                     variant="contained"
                     onClick={() =>
                       addProduct(
@@ -770,6 +791,7 @@ const Order = () => {
                         formValues.cost
                       )
                     }
+                    fullWidth
                   >
                     {productButtonText}
                   </Button>

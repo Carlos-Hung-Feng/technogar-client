@@ -41,12 +41,26 @@ const Inventory = () => {
   };
 
   const _columns = [
-    { field: "id", headerName: "ID", headerAlign: "center", flex: 1 },
-    { field: "BarCode", headerName: "Código", headerAlign: "center", flex: 1 },
     {
-      field: "Category",
-      headerName: "Categoría",
+      field: "id",
+      headerName: "ID",
       headerAlign: "center",
+      align: "center",
+      flex: 1,
+    },
+    {
+      field: "BarCode",
+      headerName: "Código",
+      headerAlign: "center",
+      align: "center",
+      flex: 1,
+    },
+    {
+      field: "Name",
+      headerName: "Nombre",
+      cellClassName: "name-column--cell",
+      headerAlign: "center",
+      align: "center",
       flex: 1,
     },
     {
@@ -57,17 +71,18 @@ const Inventory = () => {
       flex: 1,
     },
     {
-      field: "Name",
-      headerName: "Nombre",
-      cellClassName: "name-column--cell",
+      field: "Category",
+      headerName: "Categoría",
       headerAlign: "center",
+      align: "center",
       flex: 1,
     },
     {
       field: "Description",
       headerName: "Descripcion",
-      width: 545,
+      width: 400,
       headerAlign: "center",
+      align: "center",
     },
     {
       field: "MinimumQuantity",
