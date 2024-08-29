@@ -12,7 +12,6 @@ export const InvoiceAPI = {
                 paymentMethodName: invoice.attributes.Payment_Method.data.attributes.Name,
                 total: invoice.attributes.Total
             }))
-            console.log(dataList);
             return dataList;
         })
         .catch(error => { throw error; });
@@ -67,11 +66,10 @@ export const InvoiceAPI = {
         .catch(error => { throw error; });
     },
     create: function(_data) {
-        console.log(_data)
         let data = {
             'data': {
                 "InvoiceNumber": _data.invoiceNumber,
-                "PaidWith": parseFloat(_data.paidWith),
+                "PaidWith": _data.paidWith === "" ? 0 : parseFloat(_data.paidWith),
                 "Returned": _data.returned,
                 "NIF": _data.NIF,
                 "RNC": _data.RNC,
@@ -108,8 +106,6 @@ export const InvoiceAPI = {
         if (_data.NIF === "") {
             delete data.data.NIF;
         }
-
-        console.log(data);
 
         return instance.request({
             url: `/invoices`,

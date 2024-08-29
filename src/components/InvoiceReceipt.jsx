@@ -139,9 +139,11 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
       <Box display={"flex"} justifyContent={"space-between"}>
         <Typography>{invoiceData.paymentMethod}:</Typography>
         <Typography>
-          {parseFloat(invoiceData.paidWith).toLocaleString("en", {
-            minimumFractionDigits: 2,
-          })}
+          {invoiceData.paidWith === ""
+            ? 0
+            : parseFloat(invoiceData.paidWith).toLocaleString("en", {
+                minimumFractionDigits: 2,
+              })}
         </Typography>
       </Box>
       <Box display={"flex"} justifyContent={"space-between"}>
@@ -165,7 +167,7 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
         producto con su caja original y el recibo de compra.
       </Typography>
       <Typography fontWeight={"bold"} align="center" mt={1}>
-        ¡Gracias por elegirnos!
+        ¡Gracias por preferirnos!
       </Typography>
       <Typography align="center">
         -------------------------------------------

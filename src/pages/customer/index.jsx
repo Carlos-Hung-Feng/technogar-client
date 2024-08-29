@@ -98,10 +98,14 @@ const Customer = () => {
   const getClientByIdentifier = () => {
     ClientAPI.getClientByIdentifier(formValues.searchClientParam)
       .then((response) => {
+        console.log("test", response);
         setFormValues(response);
         setClientOldName(response.fullName);
       })
-      .catch((err) => alert("No se pudo obtener el cliente", err));
+      .catch((err) => {
+        alert("No se pudo obtener el cliente");
+        console.error("No se pudo obtener el cliente", err);
+      });
   };
 
   const clearInputs = () => {
@@ -306,13 +310,14 @@ const Customer = () => {
                 </Select>
               </FormControl>
               <FormControl variant="filled">
-                <InputLabel id="lblCustomerType">Tipo de Cliente</InputLabel>
+                <InputLabel id="lblCustomerType">Tipo de Cliente*</InputLabel>
                 <Select
                   labelId="lblCustomerType"
                   id="sltCustomerType"
                   name="customerType"
                   value={formValues.customerType || ""}
                   onChange={handleInputChange}
+                  required
                 >
                   <MenuItem value="Wholesale">Mayorista</MenuItem>
                   <MenuItem value="Retail">Minorista</MenuItem>

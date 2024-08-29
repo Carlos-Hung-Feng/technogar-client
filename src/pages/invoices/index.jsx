@@ -378,7 +378,8 @@ const Invoices = () => {
       paidWith: _data.paidWith,
       change: _data.returned,
       creditNoteAppliedNumber: _data.creditNoteAppliedNumber,
-      creditNoteAppliedValue: _data.creditNoteAppliedValue,
+      creditNoteAppliedValue:
+        _data.total <= 0 ? sum : _data.creditNoteAppliedValue,
       products:
         _data.invoice_Products !== undefined
           ? _data.invoice_Products
@@ -569,7 +570,6 @@ const Invoices = () => {
 
     ProductAPI.getProductByBarCode(formValues.productBarCode)
       .then((data) => {
-        console.log(data);
         let price = data.retailPrice;
 
         if (client.id !== "") {
@@ -691,7 +691,9 @@ const Invoices = () => {
       }
     }
 
-    return sum - formValues.creditNoteAppliedValue;
+    return sum - formValues.creditNoteAppliedValue < 0
+      ? 0
+      : sum - formValues.creditNoteAppliedValue;
   };
 
   const calculateChange = () => {

@@ -123,7 +123,6 @@ const Order = () => {
 
     if (e.target.type === "file") {
       // Si es un archivo, guardarlo como parte del estado
-      console.log(e.target.files[0]);
       setFile(e.target.files[0]);
     }
 
@@ -149,6 +148,24 @@ const Order = () => {
         [name]: value,
       });
     }
+  };
+
+  const handleCheckOrderNumber = () => {
+    if (formValues.id !== "") return;
+
+    PurchaseOrderAPI.getOrderByOrderNumber(formValues.orderNumber).then(
+      (response) => {
+        if (response !== undefined) {
+          alert(
+            "Número de orden ya utilizada, por favor intenta con otro número (puede ser agregando un 0 al final)."
+          );
+          setFormValues({
+            ...formValues,
+            orderNumber: "",
+          });
+        }
+      }
+    );
   };
 
   const handleProductChange = (event, value) => {
@@ -248,7 +265,7 @@ const Order = () => {
         setAddedProductList(response.purchaseOrder_Products);
       })
       .catch((err) =>
-        console.log("No se pudo obtener el orden de compra", err)
+        console.error("No se pudo obtener el orden de compra", err)
       );
   };
 
@@ -282,10 +299,7 @@ const Order = () => {
           formValues.warehouse
         );
       } else {
-        console.log(_quantity);
-        console.log(oldProductQuantity);
         let quantity = _quantity - oldProductQuantity;
-        console.log(quantity);
         PurchaseOrderAPI.updateOrderProduct(formValues.id, orderProduct).then(
           (data) => {
             WarehouseAPI.getByWarehouseIdAndProductId(
@@ -366,8 +380,6 @@ const Order = () => {
     let data = addedProductList.find(
       (x) => x.productId === _orderProduct.row.productId
     );
-
-    console.log(data);
     setProductButtonText("Editar Producto");
     setFormValues({
       ...formValues,
@@ -524,6 +536,7 @@ const Order = () => {
                   type="text"
                   label="Numero del orden"
                   onChange={handleInputChange}
+                  onBlur={handleCheckOrderNumber}
                   name="orderNumber"
                   value={formValues.orderNumber || ""}
                   inputProps={formValues.id !== "" ? { readOnly: true } : {}}

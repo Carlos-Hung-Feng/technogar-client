@@ -23,7 +23,6 @@ const Inventory = () => {
     ProductAPI.getInventory()
       .then((data) => {
         // Manejar la respuesta de éxito
-        console.log("got products", data);
         setProductList([...data]);
       })
       .catch((err) => {

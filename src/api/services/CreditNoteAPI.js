@@ -10,7 +10,6 @@ export const CreditNoteAPI = {
             let creditNote = response.data.data[0]
             // TODO: Modificar el json.
             let data = undefined;
-            console.log(creditNote)
             
             if(creditNote !== undefined) {
                 data = {
@@ -40,14 +39,11 @@ export const CreditNoteAPI = {
                     }))
                 };
             }
-
-            console.log(data)
             return data;
         })
         .catch(error => { throw error; });
     },
     create: function(_data) {
-        console.log(_data)
         let data = {
             'data': {
                 "CreditNoteNumber": _data.creditNoteNumber,
@@ -90,7 +86,6 @@ export const CreditNoteAPI = {
         .catch(error => { throw error; });
     },
     updateInvoiceProduct: function(_invoiceProduct, _creditNoteId = "", ) {
-        console.log(_invoiceProduct);
         let data = {
             'data': {
                 "ReturnReason": _invoiceProduct.returnReason === "Cambio" ? "Change" : "Warranty",

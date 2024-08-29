@@ -86,7 +86,7 @@ const Product = () => {
         setProductOldName(response.name);
       })
       .catch((err) =>
-        console.log("No se pudo obtener el orden de compra", err)
+        console.error("No se pudo obtener el orden de compra", err)
       );
   };
 

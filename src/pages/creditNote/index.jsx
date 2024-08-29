@@ -283,8 +283,6 @@ const CreditNote = () => {
   };
 
   const generateReceipt = async (_data) => {
-    console.log(_data);
-
     const newInvoiceData = {
       creditNoteNumber: _data?.creditNoteNumber,
       invoiceNumber: _data?.invoiceNumber,

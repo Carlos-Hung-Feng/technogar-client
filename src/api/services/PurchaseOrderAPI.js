@@ -16,7 +16,9 @@ export const PurchaseOrderAPI = {
         })
         .then(response => {
             let order = response.data.data[0]
-            console.log(order);
+
+            if (order === undefined)
+                return undefined;
             // TODO: Modificar el json.
             const data = {
                 id: order.id,

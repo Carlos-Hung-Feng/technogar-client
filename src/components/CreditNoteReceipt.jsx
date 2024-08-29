@@ -114,7 +114,7 @@ const CreditNoteReceipt = React.forwardRef(({ invoiceData }, ref) => {
         Agradecemos su comprensión.
       </Typography>
       <Typography fontWeight={"bold"} align="center" mt={1}>
-        ¡Gracias por elegirnos!
+        ¡Gracias por preferirnos!
       </Typography>
       <Typography align="center">
         -------------------------------------------
