@@ -22,13 +22,15 @@ const CreditNoteReceipt = React.forwardRef(({ invoiceData }, ref) => {
       className="receipt"
     >
       <Box className="header">
+        <Typography>.</Typography>
         <Typography fontWeight={"bold"} align="center" fontSize={"20px"}>
           TechnOgar.S.R.L
         </Typography>
         <Typography align="center">
           Av. San Vicente de Paul # 5, Alma Rosa I, Santo Domingo Este 11504
         </Typography>
-        <Typography align="center">Tel: (829) 397-5667</Typography>
+        <Typography>RNC: 133052202</Typography>
+        <Typography>Tel: (829) 397-5667</Typography>
       </Box>
       <Typography align="center">
         -------------------------------------------
@@ -44,19 +46,41 @@ const CreditNoteReceipt = React.forwardRef(({ invoiceData }, ref) => {
       <Typography fontWeight={"bold"}>
         NC #: {invoiceData.creditNoteNumber}
       </Typography>
+      {invoiceData.creditNoteNCF && (
+        <Box display={"flex"} gap={"3px"}>
+          <Typography fontWeight={"bold"}>NCF: </Typography>
+          <Typography>{invoiceData.creditNoteNCF}</Typography>
+        </Box>
+      )}
+      {invoiceData.creditNoteCreatedAt && (
+        <Typography>
+          {new Date(invoiceData.creditNoteCreatedAt).toLocaleString()}
+        </Typography>
+      )}
+      <Typography align="center">
+        -------------------------------------------
+      </Typography>
       <Typography fontWeight={"bold"}>
         Factura #: {invoiceData.invoiceNumber}
       </Typography>
-      <Typography>
-        {new Date(invoiceData.createdAt).toLocaleString()}
-      </Typography>
+      {invoiceData.invoiceNCF && (
+        <Box display={"flex"} gap={"3px"}>
+          <Typography fontWeight={"bold"}>NCF Mod. #:</Typography>
+          <Typography>{invoiceData.invoiceNCF}</Typography>
+        </Box>
+      )}
+      {invoiceData.invoiceCreatedAt && (
+        <Typography>
+          {new Date(invoiceData.invoiceCreatedAt).toLocaleString()}
+        </Typography>
+      )}
       <Typography align="center">
         -------------------------------------------
       </Typography>
       <Box display={"grid"} gridTemplateColumns={"1fr 2fr 1fr"}>
         <Typography>Precio</Typography>
-        <Typography align="center">Descuento</Typography>
-        <Typography align="right">Subtotal</Typography>
+        <Typography align="center">ITBIS</Typography>
+        <Typography align="right">Valor*</Typography>
       </Box>
       <Typography align="center">
         -------------------------------------------
@@ -74,10 +98,10 @@ const CreditNoteReceipt = React.forwardRef(({ invoiceData }, ref) => {
               {product.price.toLocaleString("en", { minimumFractionDigits: 2 })}
             </Typography>
             <Typography align="center" fontSize={"11px"}>
-              -
-              {product.discount.toLocaleString("en", {
-                minimumFractionDigits: 2,
-              })}
+              {(
+                Math.round((product.subtotal - product.subtotal / 1.18) * 100) /
+                100
+              ).toLocaleString("en", { minimumFractionDigits: 2 })}
             </Typography>
             <Typography align="right" fontSize={"11px"}>
               {product.subtotal.toLocaleString("en", {
@@ -90,17 +114,37 @@ const CreditNoteReceipt = React.forwardRef(({ invoiceData }, ref) => {
       <Typography align="center">
         -------------------------------------------
       </Typography>
-      <Box display={"flex"} justifyContent={"space-between"}>
-        <Typography fontWeight={"bold"} fontSize={"15px"}>
-          Total:
+      <Box
+        display={"grid"}
+        gridTemplateColumns={"1.5fr 2fr 1.5fr"}
+        alignItems={"center"}
+      >
+        <Typography fontWeight={"bold"}>Total:</Typography>
+        <Typography align="center" fontWeight={"bold"} fontSize={"11px"}>
+          {(
+            Math.round((invoiceData.total - invoiceData.total / 1.18) * 100) /
+            100
+          ).toLocaleString("en", { minimumFractionDigits: 2 })}
         </Typography>
-        <Typography fontWeight={"bold"} fontSize={"15px"}>
+        <Typography fontWeight={"bold"} align="right">
           {invoiceData.total.toLocaleString("en", { minimumFractionDigits: 2 })}
         </Typography>
       </Box>
       <Typography align="center">
         -------------------------------------------
       </Typography>
+      <Typography fontWeight={"bold"}>Nota:</Typography>
+      <Typography fontSize={"10px"}>
+        *Los montos reflejados son valores finales después de aplicar los
+        descuentos correspondientes de la factura relacionada.
+      </Typography>
+      <Typography align="center">
+        -------------------------------------------
+      </Typography>
+      <Box mt={5}>
+        <hr />
+        <Typography align="center">Firma del emisor</Typography>
+      </Box>
       {invoiceData.creditNoteNumber && (
         <Barcode
           value={invoiceData.creditNoteNumber}
@@ -116,9 +160,7 @@ const CreditNoteReceipt = React.forwardRef(({ invoiceData }, ref) => {
       <Typography fontWeight={"bold"} align="center" mt={1}>
         ¡Gracias por preferirnos!
       </Typography>
-      <Typography align="center">
-        -------------------------------------------
-      </Typography>
+      <Typography>.</Typography>
     </Box>
   );
 });

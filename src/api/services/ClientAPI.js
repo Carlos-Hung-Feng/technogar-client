@@ -16,7 +16,9 @@ export const ClientAPI = {
         })
         .then(response => {
             let client = response.data.data[0]
-            console.log(client)
+            if (client === undefined)
+                return undefined;
+            
             const data = {
                 id: client.id,
                 fullName: client.attributes.FullName,
@@ -29,7 +31,29 @@ export const ClientAPI = {
                 lastPurchaseDate: client.attributes.LastPurchaseDate,
                 note: client.attributes.Note,
                 customerType: client.attributes.CustomerType,
-                links: client.attributes.Links
+                links: client.attributes.Links,
+                customerCode: client.attributes.CustomerCode,
+            };
+            return data;
+        })
+        .catch(error => { throw error; });
+    },
+    getClientByCustomerCode: function (_customerCode) {
+        return instance.request({
+        url: `/customers?filters[CustomerCode][$eq]=${_customerCode}`,
+        method: 'GET',
+        })
+        .then(response => {
+            let client = response.data.data[0]
+            if (client === undefined)
+                return undefined;
+            
+            const data = {
+                id: client.id,
+                identifier: client.attributes.Identifier,
+                fullName: client.attributes.FullName,
+                customerType: client.attributes.CustomerType,
+                customerCode: client.attributes.CustomerCode,
             };
             return data;
         })
@@ -48,6 +72,7 @@ export const ClientAPI = {
                 "CustomerType": _data.customerType,
                 "Active": true,
                 "Links": _data.links,
+                "CustomerCode": _data.customerCode,
                 "Product_Preferences": _data.productPreferences !== "" 
                 ? 
                     {
@@ -86,6 +111,7 @@ export const ClientAPI = {
                 "CustomerType": _data.customerType,
                 "Active": true,
                 "Links": _data.links,
+                "CustomerCode": _data.customerCode,
                 "Product_Preferences": _data.productPreferences !== "" 
                 ? 
                     {

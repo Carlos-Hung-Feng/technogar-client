@@ -11,17 +11,14 @@ import {
   useTheme,
 } from "@mui/material";
 import React from "react";
-import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import SearchIcon from "@mui/icons-material/Search";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CancelIcon from "@mui/icons-material/Cancel";
 import LocalPrintshopOutlinedIcon from "@mui/icons-material/LocalPrintshopOutlined";
 import Header from "../../components/Header";
 import { tokens } from "../../theme";
 import { useState } from "react";
 import { InvoiceAPI } from "../../api/services/InvoiceAPI";
-import { DataGrid, GridActionsCellItem } from "@mui/x-data-grid";
+import { DataGrid } from "@mui/x-data-grid";
 import { useRef } from "react";
 import { useReactToPrint } from "react-to-print";
 import CreditNoteReceipt from "../../components/CreditNoteReceipt";
@@ -29,7 +26,7 @@ import { WarehouseAPI } from "../../api/services/WarehouseAPI";
 import { CreditNoteAPI } from "../../api/services/CreditNoteAPI";
 import { useEffect } from "react";
 import { InvoiceDiscountAPI } from "../../api/services/InvoiceDiscountAPI";
-import { ArrowDropDownCircleOutlined } from "@mui/icons-material";
+import { NcfAPI } from "../../api/services/NcfAPI";
 
 const CreditNote = () => {
   const theme = useTheme();
@@ -50,7 +47,10 @@ const CreditNote = () => {
     generatedUserId: "",
     appliedToInvoiceId: "",
     status: "",
-    createdAt: new Date(),
+    invoiceNCF: "",
+    invoiceCreatedAt: "",
+    creditNoteNCF: "",
+    creditNoteCreatedAt: new Date(),
 
     searchInvoiceParam: "",
     searchCreditNoteParam: "",
@@ -166,6 +166,22 @@ const CreditNote = () => {
     return newRow;
   };
 
+  const getNextNCF = (_data) => {
+    if (_data.currentValue === null) return `B0${_data.startRange}`;
+
+    const endRangeInt = parseInt(_data.endRange);
+    let nextValueInt = parseInt(_data.currentValue) + 1;
+    if (endRangeInt < nextValueInt) return null;
+    if (endRangeInt - 5 <= nextValueInt) {
+      alert(
+        `Aviso: solo queda ${
+          endRangeInt - nextValueInt
+        } numeros de comprobantes fiscales, por favor contacta al departamento administrativo.`
+      );
+    }
+    return `B0${nextValueInt}`;
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     // Aquí puedes manejar la lógica de envío del formulario
@@ -181,104 +197,173 @@ const CreditNote = () => {
       appliedToInvoiceId: "",
       status: "Generated",
       total: calculateTotal(),
+      creditNoteCreatedAt: new Date(),
       invoice_Products: selectedProductList,
     };
 
+    let submit = true;
+
+    if (formValues.invoiceNCF !== "" && formValues.id === "") {
+      // get NCF y crear nota de creditos con NCF
+      await NcfAPI.getNcfByCode("B04") // Nota de Credito
+        .then((response) => {
+          if (response !== undefined) {
+            const NCF = getNextNCF(response);
+            if (NCF === null) {
+              alert(
+                "NCF agotada, por favor contactar con el departamento administrativo."
+              );
+              submit = false;
+            }
+            if (submit) {
+              data.creditNoteNCF = NCF;
+              response.currentValue = NCF;
+              NcfAPI.update(response);
+            }
+          } else {
+            submit = false;
+            alert(
+              "NCF no encontrada, por favor contactar con el departamento administrativo"
+            );
+          }
+        })
+        .catch((err) => {
+          submit = false;
+          alert("No se pudo obtener NCF para la nota de crédito.");
+          console.error("No se pudo obtener NCF para la nota de crédito.", err);
+        });
+    }
+
     await generateReceipt(data);
 
-    if (formValues.id === "") {
-      let returnReasonSelected = true;
-      selectedProductList.forEach((product) => {
-        if (product.returnReason === "") {
-          returnReasonSelected = false;
+    if (submit) {
+      if (formValues.id === "") {
+        let returnReasonSelected = true;
+        selectedProductList.forEach((product) => {
+          if (product.returnReason === "") {
+            returnReasonSelected = false;
+            return;
+          }
+        });
+
+        if (!returnReasonSelected) {
+          alert("Debes seleccionar la razon de devolución.");
           return;
         }
-      });
+        await CreditNoteAPI.create(data)
+          .then((data) => {
+            selectedProductList.forEach((product) => {
+              CreditNoteAPI.updateInvoiceProduct(product, data.data.id);
+            });
+            let changeReasonProductList = selectedProductList.filter(
+              (x) => x.returnReason === "Cambio"
+            );
 
-      if (!returnReasonSelected) {
-        alert("Debes seleccionar la razon de devolución.");
-        return;
-      }
-      await CreditNoteAPI.create(data)
-        .then((data) => {
-          selectedProductList.forEach((product) => {
-            CreditNoteAPI.updateInvoiceProduct(product, data.data.id);
+            let productsGroupedJson = Object.groupBy(
+              changeReasonProductList,
+              ({ productId }) => productId
+            );
+
+            for (let i in productsGroupedJson) {
+              WarehouseAPI.getByWarehouseIdAndProductId(
+                1, // por ahora solo tenemos un almacen, y el usuario no esta relacionado con almacen (algo como sucursal, caja, etc.).
+                i
+              ).then((warehouse) => {
+                if (warehouse.data.length > 0) {
+                  let inventory = {
+                    id: warehouse.data[0].id,
+                    quantity:
+                      parseInt(warehouse.data[0].attributes.Quantity) +
+                      productsGroupedJson[i].length,
+                  };
+                  WarehouseAPI.updateInventory(inventory);
+                } else {
+                  alert("Inventario no suficiente");
+                }
+              });
+            }
+            alert("Nota de Crédito generada exitosamente.");
+          })
+          .catch((err) => {
+            alert("No se pudo generar la Nota de Crédito");
+            console.error(err);
           });
-          let changeReasonProductList = selectedProductList.filter(
-            (x) => x.returnReason === "Cambio"
-          );
 
-          let productsGroupedJson = Object.groupBy(
-            changeReasonProductList,
-            ({ productId }) => productId
+        handlePrint();
+        clearInputs(data.creditNoteNumber);
+      } else {
+        let cancelCreditNote = true;
+        if (formValues.creditNoteNCF !== "") {
+          const creditNoteNCF = parseInt(
+            formValues.creditNoteNCF.split("B")[1]
           );
+          await NcfAPI.getNfcByNCF(creditNoteNCF) // Nota de Credito
+            .then((response) => {
+              if (response !== undefined) {
+                if (creditNoteNCF !== response.currentValue) {
+                  alert("No se puede anular Nota de Crédito con NCF.");
+                  cancelCreditNote = false;
+                }
 
-          for (let i in productsGroupedJson) {
-            WarehouseAPI.getByWarehouseIdAndProductId(
-              1, // por ahora solo tenemos un almacen, y el usuario no esta relacionado con almacen (algo como sucursal, caja, etc.).
-              i
-            ).then((warehouse) => {
-              if (warehouse.data.length > 0) {
-                let inventory = {
-                  id: warehouse.data[0].id,
-                  quantity:
-                    parseInt(warehouse.data[0].attributes.Quantity) +
-                    productsGroupedJson[i].length,
-                };
-                WarehouseAPI.updateInventory(inventory);
+                if (cancelCreditNote) {
+                  response.currentValue = response.currentValue - 1;
+                  NcfAPI.update(response);
+                }
               } else {
-                alert("Inventario no suficiente");
+                alert(
+                  "NCF no encontrada, por favor contactar con el departamento administrativo"
+                );
               }
+            })
+            .catch((err) => {
+              alert("No se pudo obtener NCF para la nota de crédito.");
+              console.error(
+                "No se pudo obtener NCF para la nota de crédito.",
+                err
+              );
             });
-          }
-          alert("Nota de Crédito generada exitosamente.");
-        })
-        .catch((err) => {
-          alert("No se pudo generar la Nota de Crédito");
-          console.error(err);
-        });
+        }
+        if (cancelCreditNote) {
+          CreditNoteAPI.delete(data)
+            .then((data) => {
+              let changeReasonProductList = selectedProductList.filter(
+                (x) => x.returnReason === "Cambio"
+              );
 
-      handlePrint();
-      clearInputs(data.creditNoteNumber);
-    } else {
-      CreditNoteAPI.delete(data)
-        .then((data) => {
-          let changeReasonProductList = selectedProductList.filter(
-            (x) => x.returnReason === "Cambio"
-          );
+              let productsGroupedJson = Object.groupBy(
+                changeReasonProductList,
+                ({ productId }) => productId
+              );
 
-          let productsGroupedJson = Object.groupBy(
-            changeReasonProductList,
-            ({ productId }) => productId
-          );
+              selectedProductList.forEach((product) => {
+                CreditNoteAPI.updateInvoiceProduct(product);
+              });
 
-          selectedProductList.forEach((product) => {
-            CreditNoteAPI.updateInvoiceProduct(product);
-          });
-
-          for (let i in productsGroupedJson) {
-            WarehouseAPI.getByWarehouseIdAndProductId(
-              1, // por ahora solo tenemos un almacen, y el usuario no esta relacionado con almacen (algo como sucursal, caja, etc.).
-              i
-            ).then((warehouse) => {
-              if (warehouse.data.length > 0) {
-                let inventory = {
-                  id: warehouse.data[0].id,
-                  quantity:
-                    parseInt(warehouse.data[0].attributes.Quantity) -
-                    productsGroupedJson[i].length,
-                };
-                WarehouseAPI.updateInventory(inventory);
-                clearInputs();
+              for (let i in productsGroupedJson) {
+                WarehouseAPI.getByWarehouseIdAndProductId(
+                  1, // por ahora solo tenemos un almacen, y el usuario no esta relacionado con almacen (algo como sucursal, caja, etc.).
+                  i
+                ).then((warehouse) => {
+                  if (warehouse.data.length > 0) {
+                    let inventory = {
+                      id: warehouse.data[0].id,
+                      quantity:
+                        parseInt(warehouse.data[0].attributes.Quantity) -
+                        productsGroupedJson[i].length,
+                    };
+                    WarehouseAPI.updateInventory(inventory);
+                  }
+                });
               }
+              alert("Nota de Crédito anulada exitosamente.");
+            })
+            .catch((err) => {
+              alert("No se pudo anular la Nota de Crédito");
+              console.error(err);
             });
-          }
-          alert("Nota de Crédito anulada exitosamente.");
-        })
-        .catch((err) => {
-          alert("No se pudo anular la Nota de Crédito");
-          console.error(err);
-        });
+          clearInputs();
+        }
+      }
     }
   };
 
@@ -288,7 +373,10 @@ const CreditNote = () => {
       invoiceNumber: _data?.invoiceNumber,
       appliedToInvoiceNumber: _data?.appliedToInvoiceNumber,
       total: calculateTotal(_data),
-      createdAt: _data.createdAt,
+      invoiceCreatedAt: _data.invoiceCreatedAt,
+      creditNoteCreatedAt: _data.creditNoteCreatedAt,
+      invoiceNCF: _data.invoiceNCF,
+      creditNoteNCF: _data.creditNoteNCF,
       products: _data.invoice_Products,
     };
     setInvoiceData(newInvoiceData); // Actualiza el estado con los nuevos datos
@@ -376,12 +464,17 @@ const CreditNote = () => {
               creditNoteNumber: "",
               invoiceNumber: formValues.searchInvoiceParam,
               searchCreditNoteParam: "",
+              invoiceCreatedAt: response.createdAt,
+              invoiceNCF: response.NCF,
             });
             setInvoiceData(null);
             setSelectedProductList([]);
             setAddedProductList(response.invoice_Products);
 
             response.invoice_Products = [];
+            response.invoiceCreatedAt = response.createdAt;
+            response.invoiceNCF = response.NCF;
+            response.creditNoteCreatedAt = formValues.creditNoteCreatedAt;
 
             generateReceipt(response);
           } else {

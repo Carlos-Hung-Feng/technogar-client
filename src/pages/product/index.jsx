@@ -347,10 +347,7 @@ const Product = () => {
                     ? {
                         readOnly: true,
                         endAdornment: (
-                          <IconButton
-                            type="button"
-                            onClick={handleBarCodeGenerate}
-                          >
+                          <IconButton type="button">
                             <Tooltip
                               id="button-generate"
                               title="Generar código de barra"

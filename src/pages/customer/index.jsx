@@ -11,18 +11,19 @@ import {
   useTheme,
   MenuItem,
   Button,
-  Autocomplete,
-  Avatar,
+  Tooltip,
 } from "@mui/material";
-import { DataGrid, GridActionsCellItem } from "@mui/x-data-grid";
 import { tokens } from "../../theme";
-import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import SearchIcon from "@mui/icons-material/Search";
+import CachedIcon from "@mui/icons-material/Cached";
+import LocalPrintshopOutlinedIcon from "@mui/icons-material/LocalPrintshopOutlined";
 import Header from "../../components/Header";
 import { PaymentMethodAPI } from "../../api/services/PaymentMethodAPI";
-import { CategoryAPI } from "../../api/services/CategoryAPI"; // Assuming you have an API for categories
+import { CategoryAPI } from "../../api/services/CategoryAPI";
 import { ClientAPI } from "../../api/services/ClientAPI";
+import { useRef } from "react";
+import { useReactToPrint } from "react-to-print";
+import CustomerCodeReceipt from "../../components/CustomerCodeReceipt";
 
 const Customer = () => {
   const theme = useTheme();
@@ -44,8 +45,12 @@ const Customer = () => {
     note: "",
     customerType: "",
     links: "",
+    customerCode: "",
     searchClientParam: "",
   });
+
+  const [customerCodeData, setCustomerCodeData] = useState(null); // Estado para almacenar los datos del cliente
+  const customerCodeReceiptRef = useRef();
 
   useEffect(() => {
     PaymentMethodAPI.getAll()
@@ -73,6 +78,11 @@ const Customer = () => {
     });
   };
 
+  const handlePrintCustomerCode = useReactToPrint({
+    content: () => customerCodeReceiptRef.current,
+    documentTitle: "Código del cliente",
+  });
+
   const handleFormSubmit = (e) => {
     e.preventDefault();
     let data = { ...formValues };
@@ -86,8 +96,12 @@ const Customer = () => {
             id: data.data.id,
           });
           setClientOldName(formValues.fullName);
+          setCustomerCodeData({
+            code: formValues.customerCode,
+          });
         })
         .catch((err) => alert("No se pudo crear el cliente", err));
+      handlePrintCustomerCode();
     } else {
       ClientAPI.update(data)
         .then((data) => alert("Cliente actualizado exitosamente"))
@@ -95,12 +109,56 @@ const Customer = () => {
     }
   };
 
+  const handleCheckIdentifier = () => {
+    if (formValues.id !== "") return;
+
+    ClientAPI.getClientByIdentifier(formValues.identifier).then((response) => {
+      if (response !== undefined) {
+        alert("Cédula / RNC ya utilizada, por favor intenta con otro número.");
+        setFormValues({
+          ...formValues,
+          identifier: "",
+        });
+      }
+    });
+  };
+
+  const handleCustomerCodeGenerate = () => {
+    if (formValues.id !== "") {
+      return;
+    }
+
+    const randomCode = Math.floor(Math.random() * 1e10)
+      .toString()
+      .padStart(10, "0");
+
+    ClientAPI.getClientByCustomerCode(randomCode).then((data) => {
+      if (data.data.length > 0) {
+        handleCustomerCodeGenerate();
+        return;
+      }
+    });
+
+    setFormValues({
+      ...formValues,
+      customerCode: randomCode,
+    });
+  };
+
   const getClientByIdentifier = () => {
     ClientAPI.getClientByIdentifier(formValues.searchClientParam)
       .then((response) => {
         console.log("test", response);
-        setFormValues(response);
-        setClientOldName(response.fullName);
+        if (response !== undefined) {
+          setFormValues(response);
+          setClientOldName(response.fullName);
+
+          setCustomerCodeData({
+            code: response.customerCode,
+          });
+        } else {
+          alert("RNC / Cédula incorrecta, por favor intenta de nuevo.");
+        }
       })
       .catch((err) => {
         alert("No se pudo obtener el cliente");
@@ -122,15 +180,10 @@ const Customer = () => {
       note: "",
       customerType: "",
       links: "",
+      customerCode: "",
       searchClientParam: "",
     });
   };
-
-  const validateIdentifier = (_identifier) => {
-    // Add Identifier validation logic here
-    return true;
-  };
-
   return (
     <Box m="20px">
       <Box
@@ -235,13 +288,91 @@ const Customer = () => {
               />
               <TextField
                 variant="filled"
+                label="Código del cliente"
+                name="customerCode"
+                value={formValues.customerCode || ""}
+                onChange={handleInputChange}
+                InputProps={
+                  formValues.id !== ""
+                    ? {
+                        readOnly: true,
+                        endAdornment: (
+                          <IconButton
+                            type="button"
+                            onClick={handlePrintCustomerCode}
+                          >
+                            <Tooltip
+                              id="button-generate"
+                              title="Generar código de barra"
+                            >
+                              <LocalPrintshopOutlinedIcon />
+                            </Tooltip>
+                          </IconButton>
+                        ),
+                      }
+                    : {
+                        endAdornment: (
+                          <IconButton
+                            type="button"
+                            onClick={handleCustomerCodeGenerate}
+                          >
+                            <Tooltip
+                              id="button-generate"
+                              title="Generar código de barra"
+                            >
+                              <CachedIcon />
+                            </Tooltip>
+                          </IconButton>
+                        ),
+                      }
+                }
+                required
+              />
+              <TextField
+                variant="filled"
                 type="text"
                 label='RNC / Cédula (sin guión "-")'
                 onChange={handleInputChange}
+                onBlur={handleCheckIdentifier}
                 name="identifier"
                 value={formValues.identifier || ""}
                 required
               />
+              <Box display={"flex"} gap={3.5}>
+                <FormControl variant="filled" fullWidth>
+                  <InputLabel id="lblPaymentMethod">Método de Pago</InputLabel>
+                  <Select
+                    labelId="lblPaymentMethod"
+                    id="sltPaymentMethod"
+                    name="paymentMethod"
+                    value={formValues.paymentMethod || ""}
+                    onChange={handleInputChange}
+                  >
+                    <MenuItem value="">
+                      <em>Ninguno</em>
+                    </MenuItem>
+                    {paymentMethodList.map((method) => (
+                      <MenuItem key={method.id} value={method.id}>
+                        {method.attributes.Name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl variant="filled" fullWidth>
+                  <InputLabel id="lblCustomerType">Tipo de Cliente*</InputLabel>
+                  <Select
+                    labelId="lblCustomerType"
+                    id="sltCustomerType"
+                    name="customerType"
+                    value={formValues.customerType || ""}
+                    onChange={handleInputChange}
+                    required
+                  >
+                    <MenuItem value="Wholesale">Mayorista</MenuItem>
+                    <MenuItem value="Retail">Minorista</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box>
               <TextField
                 variant="filled"
                 type="text"
@@ -290,39 +421,6 @@ const Customer = () => {
                   ))}
                 </Select>
               </FormControl>
-              <FormControl variant="filled">
-                <InputLabel id="lblPaymentMethod">Método de Pago</InputLabel>
-                <Select
-                  labelId="lblPaymentMethod"
-                  id="sltPaymentMethod"
-                  name="paymentMethod"
-                  value={formValues.paymentMethod || ""}
-                  onChange={handleInputChange}
-                >
-                  <MenuItem value="">
-                    <em>Ninguno</em>
-                  </MenuItem>
-                  {paymentMethodList.map((method) => (
-                    <MenuItem key={method.id} value={method.id}>
-                      {method.attributes.Name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl variant="filled">
-                <InputLabel id="lblCustomerType">Tipo de Cliente*</InputLabel>
-                <Select
-                  labelId="lblCustomerType"
-                  id="sltCustomerType"
-                  name="customerType"
-                  value={formValues.customerType || ""}
-                  onChange={handleInputChange}
-                  required
-                >
-                  <MenuItem value="Wholesale">Mayorista</MenuItem>
-                  <MenuItem value="Retail">Minorista</MenuItem>
-                </Select>
-              </FormControl>
               <TextField
                 variant="filled"
                 type="text"
@@ -362,6 +460,12 @@ const Customer = () => {
               </Button>
             </Box>
           </form>
+        </Box>
+        <Box display={"none"}>
+          <CustomerCodeReceipt
+            ref={customerCodeReceiptRef}
+            customerCodeData={customerCodeData}
+          />
         </Box>
       </Box>
     </Box>
