@@ -14,7 +14,6 @@ export const ProductAPI = {
                 name: product.attributes.Name,
                 supplierId: product.attributes.Supplier.data.id
             }));
-            //console.log(data);
             return data;
         })
         .catch(error => { throw error; });
@@ -25,12 +24,6 @@ export const ProductAPI = {
         method: 'GET',
         })
         .then(response => {
-            // let sum = 0;
-            // addedProductList.forEach(invoice => {
-            //     sum += invoice.subtotal;
-            // });
-
-            console.log(response);
             const data = response.data.data.map(product => ({
                 id: product.id,
                 BarCode: product.attributes.BarCode,
@@ -56,7 +49,6 @@ export const ProductAPI = {
                 // })),
                 Category: product.attributes.Category.data.attributes.Name,
             }));
-            console.log(data);
             return data;
         })
         .catch(error => { throw error; });
@@ -67,7 +59,6 @@ export const ProductAPI = {
         method: 'GET',
         })
         .then(response => {
-            console.log(response.data.data)
 
             let product = response.data.data[0]
             let dimensionArray = product.attributes.Dimensions.split('x');
@@ -131,7 +122,6 @@ export const ProductAPI = {
         .catch(error => { throw error; });
     },
     create: function(_data) {
-        console.log(_data)
         let data = {
             'data': {
                 "BarCode": _data.barCode,

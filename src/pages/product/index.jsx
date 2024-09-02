@@ -86,7 +86,7 @@ const Product = () => {
         setProductOldName(response.name);
       })
       .catch((err) =>
-        console.log("No se pudo obtener el orden de compra", err)
+        console.error("No se pudo obtener el orden de compra", err)
       );
   };
 
@@ -347,10 +347,7 @@ const Product = () => {
                     ? {
                         readOnly: true,
                         endAdornment: (
-                          <IconButton
-                            type="button"
-                            onClick={handleBarCodeGenerate}
-                          >
+                          <IconButton type="button">
                             <Tooltip
                               id="button-generate"
                               title="Generar código de barra"
@@ -417,7 +414,7 @@ const Product = () => {
                 <TextField
                   variant="filled"
                   type="number"
-                  label="Precio al por menor"
+                  label="Precio al detalle"
                   name="retailPrice"
                   value={formValues.retailPrice}
                   onChange={handleInputChange}

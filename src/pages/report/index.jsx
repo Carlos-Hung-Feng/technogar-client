@@ -1,29 +1,47 @@
 import { React, useState, useEffect } from "react";
 import { Box, Button, Typography, useTheme } from "@mui/material";
-import { useNavigate } from "react-router-dom";
 import { tokens } from "../../theme";
-import { DataGrid, GridActionsCellItem } from "@mui/x-data-grid";
+import * as XLSX from "xlsx";
+import { DataGrid } from "@mui/x-data-grid";
 import { ProductAPI } from "../../api/services/ProductAPI";
-import RemoveRedEyeOutlinedIcon from "@mui/icons-material/RemoveRedEyeOutlined";
+import { InvoiceAPI } from "../../api/services/InvoiceAPI";
+import { CreditNoteAPI } from "../../api/services/CreditNoteAPI";
 
-const Inventory = () => {
+const Report = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const navigate = useNavigate();
 
-  const [productList, setProductList] = useState([]);
-  const [columnVisibilityModel, setColumnVisibilityModel] = useState({
-    id: false,
-  });
+  const [ncfList, setNcfList] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    ProductAPI.getInventory()
-      .then((data) => {
-        // Manejar la respuesta de éxito
-        setProductList([...data]);
+    const date = new Date();
+    const date1 = `${date.getFullYear()}-${
+      date.getMonth() < 10 ? "0" + date.getMonth() : date.getMonth()
+    }-01`;
+    date.setMonth(date.getMonth() + 1, 1);
+    const date2 = `${date.getFullYear()}-${
+      date.getMonth() < 10 ? "0" + date.getMonth() : date.getMonth()
+    }-01`;
+
+    InvoiceAPI.getNCFInvoicesByDates(date1, date2)
+      .then((invoices) => {
+        CreditNoteAPI.getNCFCreditNotesByDates(date1, date2)
+          .then((creditNotes) => {
+            // Manejar la respuesta de éxito
+            const list = invoices.concat(creditNotes);
+            setNcfList([...list]);
+          })
+          .catch((err) => {
+            // Manejar el error
+            console.error("No se pudo obtener los productos", err);
+            setError("No se pudo obtener los productos");
+          })
+          .finally(() => {
+            setLoading(false);
+          });
       })
       .catch((err) => {
         // Manejar el error
@@ -34,103 +52,42 @@ const Inventory = () => {
         setLoading(false);
       });
   }, []);
-
-  const navigateToProductDetail = (_id = undefined) => {
-    navigate(_id === undefined ? `/product` : `/product/${_id}`);
+  const downloadExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(ncfList);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+    //let buffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
+    //XLSX.write(workbook, { bookType: "xlsx", type: "binary" });
+    XLSX.writeFile(workbook, "Facturas.xlsx");
   };
 
   const _columns = [
     {
-      field: "id",
-      headerName: "ID",
+      field: "NCF",
+      headerName: "NCF",
       headerAlign: "center",
       align: "center",
       flex: 1,
     },
     {
-      field: "BarCode",
-      headerName: "Código",
+      field: "ITBIS",
+      headerName: "ITBIS",
       headerAlign: "center",
       align: "center",
       flex: 1,
     },
     {
-      field: "Name",
-      headerName: "Nombre",
-      cellClassName: "name-column--cell",
+      field: "Total",
+      headerName: "Total",
       headerAlign: "center",
       align: "center",
       flex: 1,
     },
     {
-      field: "Quantity",
-      headerName: "Cantidad",
+      field: "CreatedAt",
+      headerName: "Fecha",
       headerAlign: "center",
       align: "center",
-      flex: 1,
-    },
-    {
-      field: "Category",
-      headerName: "Categoría",
-      headerAlign: "center",
-      align: "center",
-      flex: 1,
-    },
-    {
-      field: "Description",
-      headerName: "Descripcion",
-      width: 400,
-      headerAlign: "center",
-      align: "center",
-    },
-    {
-      field: "MinimumQuantity",
-      headerName: "Cantidad Minima",
-      headerAlign: "center",
-      align: "center",
-      flex: 1,
-    },
-    {
-      field: "RetailPrice",
-      headerName: "Al detalle",
-      width: 100,
-      headerAlign: "center",
-      align: "center",
-      renderCell: ({ row: { RetailPrice } }) => {
-        return (
-          <Typography color={colors.greenAccent[500]}>
-            ${RetailPrice}
-          </Typography>
-        );
-      },
-      flex: 1,
-    },
-    {
-      field: "WholesalePrice",
-      headerName: "Al por mayor",
-      width: 100,
-      headerAlign: "center",
-      align: "center",
-      renderCell: ({ row: { WholesalePrice } }) => {
-        return (
-          <Typography color={colors.blueAccent[500]}>
-            ${WholesalePrice}
-          </Typography>
-        );
-      },
-      flex: 1,
-    },
-    {
-      field: "actions",
-      type: "actions",
-      getActions: (params) => [
-        <GridActionsCellItem
-          icon={<RemoveRedEyeOutlinedIcon />}
-          title="Ver detalles"
-          label="detail"
-          onClick={() => navigateToProductDetail(params.id)}
-        />,
-      ],
       flex: 1,
     },
   ];
@@ -139,12 +96,12 @@ const Inventory = () => {
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <Box>
           <Typography fontSize={32} fontWeight={"bold"}>
-            Inventario
+            Reporte
           </Typography>
 
           <Box display="flex" alignItems="center">
             <Typography color={colors.greenAccent[500]} fontSize={15}>
-              Hacer clic en la fila para ver detalles del producto.
+              Reporte de las facturas con RNC.
             </Typography>
           </Box>
         </Box>
@@ -153,9 +110,9 @@ const Inventory = () => {
             type="button"
             color="secondary"
             variant="contained"
-            onClick={() => navigateToProductDetail(undefined)}
+            onClick={downloadExcel}
           >
-            Agregar Producto
+            Exportar Excel
           </Button>
         </Box>
       </Box>
@@ -194,13 +151,13 @@ const Inventory = () => {
         }}
       >
         <DataGrid
-          rows={productList}
+          rows={ncfList}
           columns={_columns}
-          columnVisibilityModel={columnVisibilityModel}
+          getRowId={() => Math.random()}
         />
       </Box>
     </Box>
   );
 };
 
-export default Inventory;
+export default Report;

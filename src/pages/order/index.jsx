@@ -58,9 +58,9 @@ const Order = () => {
     supplier: "",
     telephone: "",
     paymentMethod: "",
-    tax: "",
+    tax: 0,
     warehouse: "",
-    freight: "",
+    freight: 0,
     documentName: "",
     shippingAddress: "",
     note: "",
@@ -123,22 +123,49 @@ const Order = () => {
 
     if (e.target.type === "file") {
       // Si es un archivo, guardarlo como parte del estado
-      console.log(e.target.files[0]);
       setFile(e.target.files[0]);
     }
 
-    setFormValues({
-      ...formValues,
-      [name]: value,
-    });
-
+    let supplierPhoneNumber = "";
     if (name === "supplier") {
       setFilteredProductBasicInfoList(
         productBasicInfoList.filter((x) => x.supplierId === value)
       );
-
+      supplierPhoneNumber = supplierList.find((x) => x.id === value).attributes
+        .Telephone;
       setAddedProductList([]);
     }
+
+    if (supplierPhoneNumber !== "") {
+      setFormValues({
+        ...formValues,
+        [name]: value,
+        telephone: supplierPhoneNumber,
+      });
+    } else {
+      setFormValues({
+        ...formValues,
+        [name]: value,
+      });
+    }
+  };
+
+  const handleCheckOrderNumber = () => {
+    if (formValues.id !== "") return;
+
+    PurchaseOrderAPI.getOrderByOrderNumber(formValues.orderNumber).then(
+      (response) => {
+        if (response !== undefined) {
+          alert(
+            "Número de orden ya utilizada, por favor intenta con otro número (puede ser agregando un 0 al final)."
+          );
+          setFormValues({
+            ...formValues,
+            orderNumber: "",
+          });
+        }
+      }
+    );
   };
 
   const handleProductChange = (event, value) => {
@@ -232,10 +259,13 @@ const Order = () => {
     PurchaseOrderAPI.getOrderByOrderNumber(formValues.searchPurchaseOrderParam)
       .then((response) => {
         setFormValues(response);
+        setFilteredProductBasicInfoList(
+          productBasicInfoList.filter((x) => x.supplierId === response.supplier)
+        );
         setAddedProductList(response.purchaseOrder_Products);
       })
       .catch((err) =>
-        console.log("No se pudo obtener el orden de compra", err)
+        console.error("No se pudo obtener el orden de compra", err)
       );
   };
 
@@ -269,10 +299,7 @@ const Order = () => {
           formValues.warehouse
         );
       } else {
-        console.log(_quantity);
-        console.log(oldProductQuantity);
         let quantity = _quantity - oldProductQuantity;
-        console.log(quantity);
         PurchaseOrderAPI.updateOrderProduct(formValues.id, orderProduct).then(
           (data) => {
             WarehouseAPI.getByWarehouseIdAndProductId(
@@ -353,8 +380,6 @@ const Order = () => {
     let data = addedProductList.find(
       (x) => x.productId === _orderProduct.row.productId
     );
-
-    console.log(data);
     setProductButtonText("Editar Producto");
     setFormValues({
       ...formValues,
@@ -511,6 +536,7 @@ const Order = () => {
                   type="text"
                   label="Numero del orden"
                   onChange={handleInputChange}
+                  onBlur={handleCheckOrderNumber}
                   name="orderNumber"
                   value={formValues.orderNumber || ""}
                   inputProps={formValues.id !== "" ? { readOnly: true } : {}}
@@ -520,7 +546,7 @@ const Order = () => {
                   variant="filled"
                   sx={{ minWidth: 120, width: "100%" }}
                 >
-                  <InputLabel id="lblPaymentMethod">Método de Pago</InputLabel>
+                  <InputLabel id="lblPaymentMethod">Método de Pago*</InputLabel>
                   <Select
                     labelId="lblPaymentMethod"
                     id="sltPaymentMethod"
@@ -540,7 +566,7 @@ const Order = () => {
                   variant="filled"
                   sx={{ minWidth: 120, width: "100%" }}
                 >
-                  <InputLabel id="lblSupplier">Proveedor</InputLabel>
+                  <InputLabel id="lblSupplier">Proveedor*</InputLabel>
                   <Select
                     labelId="lblSupplier"
                     id="sltSupplier"
@@ -574,6 +600,7 @@ const Order = () => {
                   value={formValues.shippingAddress || ""}
                   multiline
                   rows={5}
+                  required
                 />
                 <TextField
                   variant="filled"
@@ -598,7 +625,7 @@ const Order = () => {
                     label="Impuesto"
                     onChange={handleInputChange}
                     name="tax"
-                    value={formValues.tax || ""}
+                    value={formValues.tax || 0}
                   />
                   <TextField
                     variant="filled"
@@ -606,13 +633,13 @@ const Order = () => {
                     label="Flete"
                     onChange={handleInputChange}
                     name="freight"
-                    value={formValues.freight || ""}
+                    value={formValues.freight || 0}
                   />
                   <FormControl
                     variant="filled"
                     sx={{ minWidth: 120, width: "100%" }}
                   >
-                    <InputLabel id="lblWarehouse">Almacén</InputLabel>
+                    <InputLabel id="lblWarehouse">Almacén*</InputLabel>
                     <Select
                       labelId="lblWarehouse"
                       id="sltWarehouse"
@@ -646,7 +673,7 @@ const Order = () => {
                     variant="filled"
                     sx={{ minWidth: 120, width: "100%" }}
                   >
-                    <InputLabel id="lblOrderedBy">Ordenado Por</InputLabel>
+                    <InputLabel id="lblOrderedBy">Ordenado Por*</InputLabel>
                     <Select
                       labelId="lblOrderedBy"
                       id="sltOrderedBy"
@@ -673,6 +700,7 @@ const Order = () => {
                     name="orderedDate"
                     value={formValues.orderedDate || ""}
                     InputLabelProps={{ shrink: true }}
+                    required
                   />
                 </Box>
               </Box>
@@ -706,7 +734,7 @@ const Order = () => {
                 gap={"30px"}
                 gridTemplateColumns="repeat(12, 1fr)"
               >
-                <Box gridColumn="span 6">
+                <Box gridColumn="span 3">
                   <Autocomplete
                     options={filteredProductBasicInfoList}
                     getOptionLabel={(option) =>
@@ -752,7 +780,7 @@ const Order = () => {
                   />
                 </Box>
                 <Box
-                  gridColumn="span 12"
+                  gridColumn="span 3"
                   display={"flex"}
                   justifyContent={"flex-end"}
                 >
@@ -762,6 +790,12 @@ const Order = () => {
                         ? "info"
                         : "warning"
                     }
+                    disabled={
+                      formValues.product === null ||
+                      formValues.quantity === "0" ||
+                      formValues.quantity === "" ||
+                      formValues.cost === ""
+                    }
                     variant="contained"
                     onClick={() =>
                       addProduct(
@@ -770,6 +804,7 @@ const Order = () => {
                         formValues.cost
                       )
                     }
+                    fullWidth
                   >
                     {productButtonText}
                   </Button>

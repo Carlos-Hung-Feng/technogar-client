@@ -16,6 +16,10 @@ export const AuthAPI = {
         if (userId) {
             localStorage.setItem('userId', userId);
         }
+
+        const today = new Date().toLocaleDateString("en-US");
+        localStorage.setItem('loginDate', today)
+
         return response.data;
         })
         .catch(error => { throw error; });
@@ -23,6 +27,7 @@ export const AuthAPI = {
     logout: function () {
         localStorage.removeItem('token');
         localStorage.removeItem('userId');
+        localStorage.removeItem('loginDate');
         
         // return instance.request({
         // url: '/auth/logout',

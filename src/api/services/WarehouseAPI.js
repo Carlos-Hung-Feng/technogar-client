@@ -46,7 +46,6 @@ export const WarehouseAPI = {
         .catch(error => { throw error; });
     },
     updateInventory: function(_data) {
-        console.log(_data);
         let data = {
             'data': {
                 "Quantity": _data.quantity

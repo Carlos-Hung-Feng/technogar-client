@@ -17,17 +17,27 @@ const CustomModal = ({
   onClick,
   message,
   onSubmit,
+  submitButtonText,
+  disableBackdropClick = false,
 }) => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
+
+  const handleClose = (event, reason) => {
+    if (reason !== "backdropClick" || !disableBackdropClick) {
+      setOpen(false);
+    }
+  };
   return (
     <div>
-      <IconButton type="button" onClick={onClick}>
-        {buttonIcon}
-      </IconButton>
+      {buttonIcon && (
+        <IconButton type="button" onClick={onClick}>
+          {buttonIcon}
+        </IconButton>
+      )}
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={handleClose}
         aria-labelledby="modal-modal-title"
         aria-describedby="modal-modal-description"
       >
@@ -56,7 +66,7 @@ const CustomModal = ({
           </Typography>
           <Box display={"flex"} justifyContent={"end"}>
             <Button color="secondary" variant="contained" onClick={onSubmit}>
-              Cerrar caja
+              {submitButtonText}
             </Button>
           </Box>
         </Box>

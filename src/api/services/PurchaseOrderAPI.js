@@ -16,7 +16,9 @@ export const PurchaseOrderAPI = {
         })
         .then(response => {
             let order = response.data.data[0]
-            console.log(order);
+
+            if (order === undefined)
+                return undefined;
             // TODO: Modificar el json.
             const data = {
                 id: order.id,
@@ -31,6 +33,9 @@ export const PurchaseOrderAPI = {
                 paymentMethod: order.attributes.Payment_Method?.data?.id ?? null,
                 warehouse: order.attributes.Warehouse?.data?.id ?? null,
                 orderedBy: order.attributes.Ordered_By?.data?.id ?? null,
+                product: null,
+                quantity: "",
+                cost: "",
                 purchaseOrder_Products: order.attributes.PurchaseOrder_Products.data.map(orderdProduct => ({
                     id: orderdProduct.id,
                     productId: orderdProduct.attributes.Product?.data?.id ?? null,
@@ -69,7 +74,7 @@ export const PurchaseOrderAPI = {
                     "id": _data.warehouse
                 },
                 "Ordered_By": {
-                    "id": _data.ordered_By
+                    "id": _data.orderedBy
                 }
             }
         }

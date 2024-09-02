@@ -22,22 +22,37 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
       className="receipt"
     >
       <Box className="header">
+        <Typography>.</Typography>
         <Typography fontWeight={"bold"} align="center" fontSize={"20px"}>
           TechnOgar.S.R.L
         </Typography>
         <Typography align="center">
           Av. San Vicente de Paul # 5, Alma Rosa I, Santo Domingo Este 11504
         </Typography>
-        <Typography align="center">Tel: (829) 397-5667</Typography>
+        <Typography>RNC: 133052202</Typography>
+        <Typography>Tel: (829) 397-5667</Typography>
       </Box>
 
       <Typography align="center">
         -------------------------------------------
       </Typography>
 
+      {invoiceData.isCopy && (
+        <Typography align="center" fontSize={"13px"}>
+          *Copia de factura*
+        </Typography>
+      )}
+      <Typography align="center" fontWeight={"bold"} fontSize={"13px"}>
+        Factura para{" "}
+        {invoiceData.clientRNC !== "" ? "Credito Fiscal" : "Consumidor Final"}
+      </Typography>
+      <Typography align="center">
+        -------------------------------------------
+      </Typography>
       <Typography fontWeight={"bold"}>
         Factura #: {invoiceData.invoiceNumber}
       </Typography>
+      {invoiceData.NCF && <Typography>NCF #: {invoiceData.NCF}</Typography>}
       <Typography>
         {new Date(invoiceData.createdAt).toLocaleString()}
       </Typography>
@@ -50,15 +65,8 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
       <Typography align="center">
         -------------------------------------------
       </Typography>
-      <Typography align="center" fontWeight={"bold"} fontSize={"13px"}>
-        Factura para{" "}
-        {invoiceData.clientRNC !== "" ? "Credito Fiscal" : "Consumidor Final"}
-      </Typography>
-      <Typography align="center">
-        -------------------------------------------
-      </Typography>
       <Box display={"grid"} gridTemplateColumns={"1fr 2fr 1fr"}>
-        <Typography>Cant.</Typography>
+        <Typography>Desc.</Typography>
         <Typography align="center">ITBIS</Typography>
         <Typography align="right">Valor</Typography>
       </Box>
@@ -93,20 +101,38 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
       <Typography align="center">
         -------------------------------------------
       </Typography>
-      <Box display={"flex"} justifyContent={"space-between"}>
-        <Typography>Subtotal:</Typography>
-        <Typography>
-          {invoiceData.subtotal.toLocaleString("en", {
-            minimumFractionDigits: 2,
-          })}
-        </Typography>
-      </Box>
-      {invoiceData.discount > 0 && (
-        <Box display={"flex"} justifyContent={"space-between"}>
-          <Typography>
-            Descuento&#40;{invoiceData.discountPersentage}%&#41;:
+      {invoiceData.subtotal !== invoiceData.total && (
+        <Box display={"grid"} gridTemplateColumns={"1.5fr 2fr 1.5fr"}>
+          <Typography>Subtotal:</Typography>
+          <Typography align="center">
+            {(
+              Math.round(
+                (invoiceData.subtotal - invoiceData.subtotal / 1.18) * 100
+              ) / 100
+            ).toLocaleString("en", { minimumFractionDigits: 2 })}
           </Typography>
+          <Typography align="right">
+            {invoiceData.subtotal.toLocaleString("en", {
+              minimumFractionDigits: 2,
+            })}
+          </Typography>
+        </Box>
+      )}
+
+      {invoiceData.discount > 0 && (
+        <Box display={"grid"} gridTemplateColumns={"1.5fr 2fr 1.5fr"}>
           <Typography>
+            Dto.&#40;{invoiceData.discountPersentage}%&#41;:
+          </Typography>
+          <Typography align="center">
+            -
+            {(
+              Math.round(
+                (invoiceData.discount - invoiceData.discount / 1.18) * 100
+              ) / 100
+            ).toLocaleString("en", { minimumFractionDigits: 2 })}
+          </Typography>
+          <Typography align="right">
             -
             {invoiceData.discount.toLocaleString("en", {
               minimumFractionDigits: 2,
@@ -127,18 +153,28 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
           </Typography>
         </Box>
       )}
-      <Box display={"flex"} justifyContent={"space-between"}>
-        <Typography>Total:</Typography>
-        <Typography>
-          {invoiceData.total.toLocaleString("en", { minimumFractionDigits: 2 })}
+      <Box display={"grid"} gridTemplateColumns={"1.5fr 2fr 1.5fr"}>
+        <Typography fontWeight={"bold"}>Total:</Typography>
+        <Typography fontWeight={"bold"} align="center">
+          {(
+            Math.round((invoiceData.total - invoiceData.total / 1.18) * 100) /
+            100
+          ).toLocaleString("en", { minimumFractionDigits: 2 })}
+        </Typography>
+        <Typography fontWeight={"bold"} align="right">
+          {invoiceData.total.toLocaleString("en", {
+            minimumFractionDigits: 2,
+          })}
         </Typography>
       </Box>
       <Box display={"flex"} justifyContent={"space-between"}>
         <Typography>{invoiceData.paymentMethod}:</Typography>
         <Typography>
-          {parseFloat(invoiceData.paidWith).toLocaleString("en", {
-            minimumFractionDigits: 2,
-          })}
+          {invoiceData.paidWith === ""
+            ? 0
+            : parseFloat(invoiceData.paidWith).toLocaleString("en", {
+                minimumFractionDigits: 2,
+              })}
         </Typography>
       </Box>
       <Box display={"flex"} justifyContent={"space-between"}>
@@ -162,11 +198,9 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
         producto con su caja original y el recibo de compra.
       </Typography>
       <Typography fontWeight={"bold"} align="center" mt={1}>
-        ¡Gracias por elegirnos!
+        ¡Gracias por preferirnos!
       </Typography>
-      <Typography align="center">
-        -------------------------------------------
-      </Typography>
+      <Typography>.</Typography>
     </Box>
   );
 });

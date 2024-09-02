@@ -3,14 +3,13 @@ import instance from '../axios';
 export const CreditNoteAPI = {
     getCreditNoteByCreditNoteNumber: function (_number) {
         return instance.request({
-        url: `/credit-notes?filters[CreditNoteNumber][$eq]=${_number}&populate[GeneratedUser][fields][0]=id&populate[AppliedToInvoice][fields][0]=InvoiceNumber&populate[Invoice_Products][fields][0]=Price&populate[Invoice_Products][fields][1]=ReturnReason&populate[Invoice_Products][populate][CreditNote][fields][0]=CreditNoteNumber&populate[Invoice_Products][populate][Invoice][fields][0]=InvoiceNumber&populate[Invoice_Products][populate][Product][fields][0]=id&populate[Invoice_Products][populate][Product][fields][1]=Name&populate[Invoice_Products][populate][Product][fields][2]=BarCode&populate[Invoice_Products][populate][Invoice][populate][Invoice_Discount][fields][0]=DiscountPercentage`,
+        url: `/credit-notes?filters[CreditNoteNumber][$eq]=${_number}&populate[GeneratedUser][fields][0]=id&populate[AppliedToInvoice][fields][0]=InvoiceNumber&populate[Invoice_Products][fields][0]=Price&populate[Invoice_Products][fields][1]=ReturnReason&populate[Invoice_Products][populate][CreditNote][fields][0]=CreditNoteNumber&populate[Invoice_Products][populate][Invoice][fields][0]=InvoiceNumber&populate[Invoice_Products][populate][Invoice][fields][1]=createdAt&populate[Invoice_Products][populate][Invoice][fields][2]=NCF&populate[Invoice_Products][populate][Product][fields][0]=id&populate[Invoice_Products][populate][Product][fields][1]=Name&populate[Invoice_Products][populate][Product][fields][2]=BarCode&populate[Invoice_Products][populate][Invoice][populate][Invoice_Discount][fields][0]=DiscountPercentage`,
         method: 'GET',
         })
         .then(response => {
             let creditNote = response.data.data[0]
             // TODO: Modificar el json.
             let data = undefined;
-            console.log(creditNote)
             
             if(creditNote !== undefined) {
                 data = {
@@ -21,7 +20,10 @@ export const CreditNoteAPI = {
                     appliedToInvoiceId: creditNote.attributes.AppliedToInvoice.data !== null ? creditNote.attributes.AppliedToInvoice.data.id : "",
                     appliedToInvoiceNumber: creditNote.attributes.AppliedToInvoice.data !== null ? creditNote.attributes.AppliedToInvoice.data.attributes.InvoiceNumber : "",
                     total: creditNote.attributes.Total,
-                    createdAt: creditNote.attributes.createdAt,
+                    creditNoteNCF: creditNote.attributes.NCF?? "",
+                    creditNoteCreatedAt: creditNote.attributes.createdAt,
+                    invoiceNCF: creditNote.attributes.Invoice_Products.data[0].attributes.Invoice.data.attributes.NCF?? "",
+                    invoiceCreatedAt: creditNote.attributes.Invoice_Products.data[0].attributes.Invoice.data.attributes.createdAt,
                     status: creditNote.attributes.Status,
                 
                     searchInvoiceParam: creditNote.attributes.Invoice_Products.data[0].attributes.Invoice.data.attributes.InvoiceNumber,
@@ -40,17 +42,36 @@ export const CreditNoteAPI = {
                     }))
                 };
             }
-
-            console.log(data)
             return data;
         })
         .catch(error => { throw error; });
     },
+    
+    getNCFCreditNotesByDates: function (_date1, _date2) {
+        return instance.request({
+        url: `/credit-notes?filters[createdAt][$gte]=${_date1}&[createdAt][$lte]=${_date2}&filters[Status][$ne]=Canceled&filters[NCF][$null]&[fields]0]=NCF&[fields]1]=Total&[fields]1]=createdAt&sort[0]=NCF`,
+        method: 'GET',
+        })
+        .then(response => {
+            const dataList = response.data.data.map(creditNote => ({
+                NCF: creditNote.attributes.NCF,
+                ITBIS: (
+                    Math.round((creditNote.attributes.Total - creditNote.attributes.Total / 1.18) * 100) /
+                    100
+                  ).toLocaleString("en", { minimumFractionDigits: 2 }),
+                Total: creditNote.attributes.Total,
+                CreatedAt: new Date(creditNote.attributes.createdAt).toLocaleString(),
+            }))
+            return dataList;
+        })
+        .catch(error => { throw error; });
+    },
     create: function(_data) {
-        console.log(_data)
         let data = {
             'data': {
                 "CreditNoteNumber": _data.creditNoteNumber,
+                "CreatedAt": _data.creditNoteCreatedAt,
+                "NCF": _data.creditNoteNCF,
                 "Total": _data.total,
                 "Status": _data.status,
                 "GeneratedUser": {
@@ -90,7 +111,6 @@ export const CreditNoteAPI = {
         .catch(error => { throw error; });
     },
     updateInvoiceProduct: function(_invoiceProduct, _creditNoteId = "", ) {
-        console.log(_invoiceProduct);
         let data = {
             'data': {
                 "ReturnReason": _invoiceProduct.returnReason === "Cambio" ? "Change" : "Warranty",

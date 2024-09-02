@@ -19,6 +19,7 @@ import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import MenuOutlinedIcon from "@mui/icons-material/MenuOutlined";
 import SwitchRightOutlinedIcon from "@mui/icons-material/SwitchRightOutlined";
 import SwitchLeftOutlinedIcon from "@mui/icons-material/SwitchLeftOutlined";
+import AdfScannerOutlinedIcon from "@mui/icons-material/AdfScannerOutlined";
 
 import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
@@ -199,6 +200,13 @@ const MyProSidebar = () => {
               title="Inventario"
               to="/inventory"
               icon={<InventoryOutlinedIcon />}
+              selected={selected}
+              setSelected={setSelected}
+            />
+            <Item
+              title="Reporte"
+              to="/report"
+              icon={<AdfScannerOutlinedIcon />}
               selected={selected}
               setSelected={setSelected}
             />

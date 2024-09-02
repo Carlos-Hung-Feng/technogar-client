@@ -33,6 +33,7 @@ import InvoiceReceipt from "../../components/InvoiceReceipt";
 import { CreditNoteAPI } from "../../api/services/CreditNoteAPI";
 import CashCountReceipt from "../../components/CashCountReceipt";
 import CustomModal from "../../components/CustomModal";
+import { NcfAPI } from "../../api/services/NcfAPI";
 
 const Invoices = () => {
   const theme = useTheme();
@@ -65,7 +66,7 @@ const Invoices = () => {
   const [formValues, setFormValues] = useState({
     id: "",
     invoiceNumber: "",
-    NIF: "",
+    NCF: "",
     RNC: "",
     note: "",
     paidWith: "",
@@ -163,48 +164,39 @@ const Invoices = () => {
         ? today.getMonth() + 1
         : "0" + (today.getMonth() + 1)
     }-${today.getDate()}`;
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-    let tomorrowString = `${tomorrow.getFullYear()}-${
-      tomorrow.getMonth() + 1 > 9
-        ? tomorrow.getMonth() + 1
-        : "0" + (tomorrow.getMonth() + 1)
-    }-${tomorrow.getDate()}`;
-    InvoiceAPI.getInvoiceTotalBetweenDate(todayString, tomorrowString).then(
-      (data) => {
-        const invoiceGroupedByPaymentJson = Object.groupBy(
-          data,
-          ({ paymentMethodId }) => paymentMethodId
-        );
-        let cashCountList = [];
-        let total = 0;
+    InvoiceAPI.getInvoiceTotal(todayString).then((data) => {
+      const invoiceGroupedByPaymentJson = Object.groupBy(
+        data,
+        ({ paymentMethodId }) => paymentMethodId
+      );
+      let cashCountList = [];
+      let total = 0;
 
-        for (let i in invoiceGroupedByPaymentJson) {
-          let paymentMethodName =
-            invoiceGroupedByPaymentJson[i][0].paymentMethodName;
-          let invoiceCount = invoiceGroupedByPaymentJson[i].length;
-          let sum = 0;
+      for (let i in invoiceGroupedByPaymentJson) {
+        let paymentMethodName =
+          invoiceGroupedByPaymentJson[i][0].paymentMethodName;
+        let invoiceCount = invoiceGroupedByPaymentJson[i].length;
+        let sum = 0;
 
-          invoiceGroupedByPaymentJson[i].forEach((invoice) => {
-            sum += invoice.total;
-          });
-
-          total += sum;
-
-          let data = {
-            paymentMethodName: paymentMethodName,
-            count: invoiceCount,
-            subtotal: sum,
-          };
-
-          cashCountList.push(data);
-        }
-        setCashCountData({
-          total: total,
-          invoiceCount: cashCountList,
+        invoiceGroupedByPaymentJson[i].forEach((invoice) => {
+          sum += invoice.total;
         });
+
+        total += sum;
+
+        let data = {
+          paymentMethodName: paymentMethodName,
+          count: invoiceCount,
+          subtotal: sum,
+        };
+
+        cashCountList.push(data);
       }
-    );
+      setCashCountData({
+        total: total,
+        invoiceCount: cashCountList,
+      });
+    });
     setOpenModal(true);
     //handlePrintCashCount();
   };
@@ -222,6 +214,23 @@ const Invoices = () => {
     });
 
     return invoiceNumber;
+  };
+
+  const getNextNCF = (_data) => {
+    console.log(_data);
+    if (_data.currentValue === null) return _data.startRange;
+
+    const endRangeInt = parseInt(_data.endRange);
+    let nextValueInt = parseInt(_data.currentValue) + 1;
+    if (endRangeInt < nextValueInt) return null;
+    if (endRangeInt - 5 <= nextValueInt) {
+      alert(
+        `Aviso: solo queda ${
+          endRangeInt - nextValueInt
+        } numeros de comprobantes fiscales, por favor contacta al departamento administrativo.`
+      );
+    }
+    return nextValueInt;
   };
 
   const handleSubmit = async (event) => {
@@ -244,6 +253,7 @@ const Invoices = () => {
       invoiceNumber: invoiceNumberGenerator(),
       returned: formValues.paidWith - total,
       status: "Paid",
+      createdAt: new Date(),
       total: total,
       billedById: parseInt(localStorage.getItem("userId")),
       creditNoteAppliedId: formValues.creditNoteAppliedId,
@@ -253,6 +263,7 @@ const Invoices = () => {
     };
 
     if (formValues.paymentMethodId !== 1) {
+      // Efectivo
       data = {
         ...data,
         paidWith: total,
@@ -260,95 +271,209 @@ const Invoices = () => {
       };
     }
 
-    await generateReceipt(data);
+    if (data.returned < 0) {
+      alert("Balance no suficiente.");
+      return;
+    }
+    let submit = true;
 
     if (formValues.id === "") {
-      await InvoiceAPI.create(data)
-        .then((data) => {
-          if (formValues.creditNoteAppliedId !== "") {
-            let creditNote = {
-              id: formValues.creditNoteAppliedId,
-              status: "Applied",
-            };
-            CreditNoteAPI.update(creditNote);
-          }
-
-          addedProductList.forEach((product) => {
-            InvoiceAPI.addInvoiceProduct(data.data.id, product);
+      // con RNC
+      if (formValues.RNC !== "") {
+        await NcfAPI.getNcfByCode("B01") // Credito Fiscal
+          .then((response) => {
+            if (response !== undefined) {
+              const NCF = getNextNCF(response);
+              if (NCF === null) {
+                alert(
+                  "NCF agotada, por favor contactar con el departamento administrativo."
+                );
+                submit = false;
+              }
+              if (submit) {
+                data.NCF = `B0${NCF}`;
+                response.currentValue = NCF;
+                NcfAPI.update(response);
+              }
+            } else {
+              submit = false;
+              alert(
+                "NCF no encontrada, por favor contactar con el departamento administrativo"
+              );
+            }
+          })
+          .catch((err) => {
+            submit = false;
+            alert("No se pudo obtener NCF para la factura");
+            console.error("No se pudo obtener NCF para la factura", err);
           });
-          let productsGroupedJson = Object.groupBy(
-            addedProductList,
-            ({ productId }) => productId
-          );
-
-          for (let i in productsGroupedJson) {
-            WarehouseAPI.getByWarehouseIdAndProductId(
-              1, // por ahora solo tenemos un almacen, y el usuario no esta relacionado con almacen (algo como sucursal, caja, etc.).
-              i
-            ).then((warehouse) => {
-              if (warehouse.data.length > 0) {
-                let inventory = {
-                  id: warehouse.data[0].id,
-                  quantity:
-                    parseInt(warehouse.data[0].attributes.Quantity) -
-                    productsGroupedJson[i].length,
-                };
-                WarehouseAPI.updateInventory(inventory);
+      } else {
+        if (formValues.paymentMethodId === 2) {
+          // 1 - Tarjeta
+          await NcfAPI.getNcfByCode("B02") // Consumidor Final
+            .then((response) => {
+              if (response !== undefined) {
+                const NCF = getNextNCF(response);
+                if (NCF === null) {
+                  alert(
+                    "NCF agotada, por favor contactar con el departamento administrativo."
+                  );
+                  submit = false;
+                }
+                if (submit) {
+                  data.NCF = `B0${NCF}`;
+                  response.currentValue = NCF;
+                  NcfAPI.update(response);
+                }
               } else {
-                alert("Inventario no suficiente");
+                submit = false;
+                alert(
+                  "NCF no encontrada, por favor contactar con el departamento administrativo"
+                );
               }
+            })
+            .catch((err) => {
+              submit = false;
+              alert("No se pudo obtener NCF para la factura");
+              console.error("No se pudo obtener NCF para la factura", err);
             });
+        } else {
+          // 1 - Eefectivo; 3 - Transferencia
+          if (Math.random() <= 0.1) {
+            await NcfAPI.getNcfByCode("B02") // Consumidor Final
+              .then((response) => {
+                if (response !== undefined) {
+                  const NCF = getNextNCF(response);
+                  if (NCF !== null) {
+                    data.NCF = `B0${NCF}`;
+                    response.currentValue = NCF;
+                    NcfAPI.update(response);
+                  }
+                }
+              });
           }
-          alert("Compra facturada exitosamente.");
-        })
-        .catch((err) => {
-          alert("No se pudo facturar la compra");
-          console.error(err);
-        });
+        }
+      }
+    }
 
-      handlePrintInvoice();
-      clearInputs(data.invoiceNumber);
-    } else {
-      data.status = "Canceled";
-      InvoiceAPI.update(data)
-        .then((data) => {
-          let productsGroupedJson = Object.groupBy(
-            addedProductList,
-            ({ productId }) => productId
-          );
+    await generateReceipt(data);
 
-          for (let i in productsGroupedJson) {
-            WarehouseAPI.getByWarehouseIdAndProductId(
-              1, // por ahora solo tenemos un almacen, y el usuario no esta relacionado con almacen (algo como sucursal, caja, etc.).
-              i
-            ).then((warehouse) => {
-              if (warehouse.data.length > 0) {
-                let inventory = {
-                  id: warehouse.data[0].id,
-                  quantity:
-                    parseInt(warehouse.data[0].attributes.Quantity) +
-                    productsGroupedJson[i].length,
-                };
-                WarehouseAPI.updateInventory(inventory);
-                setFormValues({
-                  ...formValues,
-                  status: "Canceled",
+    if (submit) {
+      if (formValues.id === "") {
+        await InvoiceAPI.create(data)
+          .then((response) => {
+            if (formValues.creditNoteAppliedId !== "") {
+              let creditNote = {
+                id: formValues.creditNoteAppliedId,
+                status: "Applied",
+              };
+              CreditNoteAPI.update(creditNote);
+            }
+
+            addedProductList.forEach((product) => {
+              InvoiceAPI.addInvoiceProduct(response.data.id, product);
+            });
+            let productsGroupedJson = Object.groupBy(
+              addedProductList,
+              ({ productId }) => productId
+            );
+
+            for (let i in productsGroupedJson) {
+              WarehouseAPI.getByWarehouseIdAndProductId(
+                1, // por ahora solo tenemos un almacen, y el usuario no esta relacionado con almacen (algo como sucursal, caja, etc.).
+                i
+              ).then((warehouse) => {
+                if (warehouse.data.length > 0) {
+                  let inventory = {
+                    id: warehouse.data[0].id,
+                    quantity:
+                      parseInt(warehouse.data[0].attributes.Quantity) -
+                      productsGroupedJson[i].length,
+                  };
+                  WarehouseAPI.updateInventory(inventory);
+                } else {
+                  alert("Inventario no suficiente");
+                }
+              });
+            }
+            alert("Compra facturada exitosamente.");
+          })
+          .catch((err) => {
+            alert("No se pudo facturar la compra");
+            console.error(err);
+          });
+        handlePrintInvoice();
+        clearInputs(data.invoiceNumber);
+      } else {
+        let cancelInvoice = true;
+        if (formValues.NCF !== "") {
+          const NCF = parseInt(formValues.NCF.split("B")[1]);
+          await NcfAPI.getNfcByNCF(NCF) // Nota de Credito
+            .then((response) => {
+              if (response !== undefined) {
+                if (NCF !== response.currentValue) {
+                  alert("No se puede anular Factura con NCF.");
+                  cancelInvoice = false;
+                }
+
+                if (cancelInvoice) {
+                  response.currentValue = response.currentValue - 1;
+                  NcfAPI.update(response);
+                }
+              } else {
+                alert(
+                  "NCF no encontrada, por favor contactar con el departamento administrativo"
+                );
+              }
+            })
+            .catch((err) => {
+              alert("No se pudo obtener NCF para la factura.");
+              console.error("No se pudo obtener NCF para la factura.", err);
+            });
+        }
+        if (cancelInvoice) {
+          data.status = "Canceled";
+          InvoiceAPI.update(data)
+            .then((data) => {
+              let productsGroupedJson = Object.groupBy(
+                addedProductList,
+                ({ productId }) => productId
+              );
+
+              for (let i in productsGroupedJson) {
+                WarehouseAPI.getByWarehouseIdAndProductId(
+                  1, // por ahora solo tenemos un almacen, y el usuario no esta relacionado con almacen (algo como sucursal, caja, etc.).
+                  i
+                ).then((warehouse) => {
+                  if (warehouse.data.length > 0) {
+                    let inventory = {
+                      id: warehouse.data[0].id,
+                      quantity:
+                        parseInt(warehouse.data[0].attributes.Quantity) +
+                        productsGroupedJson[i].length,
+                    };
+                    WarehouseAPI.updateInventory(inventory);
+                    setFormValues({
+                      ...formValues,
+                      status: "Canceled",
+                    });
+                  } else {
+                    alert("Inventario no suficiente");
+                  }
                 });
-              } else {
-                alert("Inventario no suficiente");
               }
+              alert("Factura anulada exitosamente.");
+            })
+            .catch((err) => {
+              alert("No se pudo anular la factura");
+              console.error(err);
             });
-          }
-          alert("Factura anulada exitosamente.");
-        })
-        .catch((err) => {
-          alert("No se pudo anular la factura");
-          console.error(err);
-        });
+        }
+      }
     }
   };
 
-  const generateReceipt = async (_data) => {
+  const generateReceipt = async (_data, _isCopy = false) => {
     let sum = 0;
     if (_data.invoice_Products !== undefined) {
       _data.invoice_Products.forEach((invoice) => {
@@ -360,8 +485,12 @@ const Invoices = () => {
       });
     }
 
-    let discount = discountList.find((x) => x.id === _data.discountId)
-      .attributes.DiscountPercentage;
+    let discount = 0;
+
+    if (_data.discountId !== "") {
+      discount = discountList.find((x) => x.id === _data.discountId).attributes
+        .DiscountPercentage;
+    }
 
     const newInvoiceData = {
       invoiceNumber: _data.invoiceNumber,
@@ -372,17 +501,20 @@ const Invoices = () => {
       discount: sum * (discount / 100),
       total: _data.total,
       createdAt: _data.createdAt,
+      NCF: _data.NCF,
       paymentMethod: paymentMethodList.find(
         (x) => x.id === _data.paymentMethodId
       ).attributes.Name,
       paidWith: _data.paidWith,
       change: _data.returned,
       creditNoteAppliedNumber: _data.creditNoteAppliedNumber,
-      creditNoteAppliedValue: _data.creditNoteAppliedValue,
+      creditNoteAppliedValue:
+        _data.total <= 0 ? sum : _data.creditNoteAppliedValue,
       products:
         _data.invoice_Products !== undefined
           ? _data.invoice_Products
           : addedProductList,
+      isCopy: _isCopy,
     };
     setInvoiceData(newInvoiceData); // Actualiza el estado con los nuevos datos
   };
@@ -406,7 +538,9 @@ const Invoices = () => {
             setAddedProductList(invoiceResponse.invoice_Products);
 
             if (invoiceResponse.searchClientParam !== "") {
-              ClientAPI.getClientByIdentifier(invoiceResponse.searchClientParam)
+              ClientAPI.getClientByCustomerCode(
+                invoiceResponse.searchClientParam
+              )
                 .then((response) => {
                   if (response !== undefined) {
                     setClient(response);
@@ -414,7 +548,7 @@ const Invoices = () => {
                       ...invoiceResponse,
                       clientName: response.fullName,
                     };
-                    generateReceipt(data);
+                    generateReceipt(data, true);
                   } else {
                     alert(
                       "Número de identificación incorrecto, por favor intenta de nuevo."
@@ -429,7 +563,7 @@ const Invoices = () => {
                   );
                 });
             } else {
-              generateReceipt(invoiceResponse);
+              generateReceipt(invoiceResponse, true);
             }
           } else {
             alert("Número de factura incorrecta, por favor intenta de nuevo.");
@@ -487,7 +621,7 @@ const Invoices = () => {
     setFormValues({
       id: "",
       invoiceNumber: "",
-      NIF: "",
+      NCF: "",
       RNC: "",
       note: "",
       paidWith: "",
@@ -525,13 +659,13 @@ const Invoices = () => {
     setAddedProductList([]);
   };
 
-  const getClientByIdentifier = () => {
+  const getClientByCustomerCode = () => {
     if (formValues.searchClientParam === "") {
       return;
     }
 
     if (client.id === "") {
-      ClientAPI.getClientByIdentifier(formValues.searchClientParam)
+      ClientAPI.getClientByCustomerCode(formValues.searchClientParam)
         .then((response) => {
           if (response !== undefined) {
             setClient(response);
@@ -554,6 +688,19 @@ const Invoices = () => {
     clearInputs();
   };
 
+  const validateRNC = () => {
+    if (formValues.searchRNCParam === "") {
+      return;
+    }
+
+    console.log(formValues.searchRNCParam);
+
+    setFormValues({
+      ...formValues,
+      RNC: formValues.searchRNCParam,
+    });
+  };
+
   const addProduct = (e) => {
     if (e.key !== "Enter" || e.keyCode !== 13) {
       return;
@@ -569,7 +716,6 @@ const Invoices = () => {
 
     ProductAPI.getProductByBarCode(formValues.productBarCode)
       .then((data) => {
-        console.log(data);
         let price = data.retailPrice;
 
         if (client.id !== "") {
@@ -691,7 +837,9 @@ const Invoices = () => {
       }
     }
 
-    return sum - formValues.creditNoteAppliedValue;
+    return sum - formValues.creditNoteAppliedValue < 0
+      ? 0
+      : sum - formValues.creditNoteAppliedValue;
   };
 
   const calculateChange = () => {
@@ -734,7 +882,7 @@ const Invoices = () => {
               />
               <IconButton
                 type="button"
-                onClick={getClientByIdentifier}
+                onClick={getClientByCustomerCode}
                 disabled={formValues.id === "" ? false : true}
               >
                 {formValues.customerId === "" ? (
@@ -754,11 +902,15 @@ const Invoices = () => {
             >
               <InputBase
                 sx={{ ml: 1, flex: 1 }}
+                name="searchRNCParam"
                 placeholder="Buscar RNC"
+                onChange={handleInputChange}
+                value={formValues.searchRNCParam || ""}
                 inputProps={formValues.id !== "" ? { readOnly: true } : {}}
               />
               <IconButton
                 type="button"
+                onClick={validateRNC}
                 disabled={formValues.id === "" ? false : true}
               >
                 <SearchIcon />
@@ -875,6 +1027,7 @@ const Invoices = () => {
                     body: "Estas seguro que deseas cerrar la caja?",
                   }}
                   onSubmit={handleSubmitModal}
+                  submitButtonText="Cerrar Caja"
                 />
               )}
             </Box>

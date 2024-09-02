@@ -21,25 +21,27 @@ const CashCountReceipt = React.forwardRef(({ cashCountData }, ref) => {
       className="receipt"
     >
       <Box className="header">
+        <Typography>.</Typography>
         <Typography fontWeight={"bold"} align="center" fontSize={"20px"}>
           TechnOgar.S.R.L
         </Typography>
         <Typography align="center">
           Av. San Vicente de Paul # 5, Alma Rosa I, Santo Domingo Este 11504
         </Typography>
-        <Typography align="center">Tel: (829) 397-5667</Typography>
+        <Typography>RNC: 133052202</Typography>
+        <Typography>Tel: (829) 397-5667</Typography>
       </Box>
 
       <Typography align="center">
         -------------------------------------------
       </Typography>
-      <Typography>Fech de cuadre de caja:</Typography>
+      <Typography>Fech de cierre de caja:</Typography>
       <Typography>{new Date().toLocaleString()}</Typography>
       <Typography align="center">
         -------------------------------------------
       </Typography>
       <Typography align="center" fontWeight={"bold"} fontSize={"20px"}>
-        Cuadre de caja
+        Cierre de caja
       </Typography>
       <Typography align="center">
         -------------------------------------------
@@ -87,9 +89,7 @@ const CashCountReceipt = React.forwardRef(({ cashCountData }, ref) => {
         Recibo generado para el cierre de caja. Verifique los montos y asegúrese
         de que todo esté en orden. ¡Gracias por su dedicación y buen trabajo!
       </Typography>
-      <Typography align="center">
-        -------------------------------------------
-      </Typography>
+      <Typography>.</Typography>
     </Box>
   );
 });
