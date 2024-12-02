@@ -59,7 +59,9 @@ export const ProductAPI = {
         method: 'GET',
         })
         .then(response => {
-
+            if (response.data.data.length <= 0){
+                return undefined;
+            }
             let product = response.data.data[0]
             let dimensionArray = product.attributes.Dimensions.split('x');
             let length = dimensionArray[0] !== undefined ? dimensionArray[0] : '';
@@ -75,6 +77,7 @@ export const ProductAPI = {
                 minimumQuantity: product.attributes.MinimumQuantity,
                 weight: product.attributes.Weight === null ? '' : product.attributes.Weight,
                 warranty: product.attributes.Warranty !== null ? product.attributes.Warranty : "",
+                
                 length: length, 
                 width: width,
                 height: height,

@@ -36,12 +36,6 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
       <Typography align="center">
         -------------------------------------------
       </Typography>
-
-      {invoiceData.isCopy && (
-        <Typography align="center" fontSize={"13px"}>
-          *Copia de factura*
-        </Typography>
-      )}
       <Typography align="center" fontWeight={"bold"} fontSize={"13px"}>
         Factura para{" "}
         {invoiceData.clientRNC !== "" ? "Credito Fiscal" : "Consumidor Final"}
@@ -67,7 +61,9 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
       </Typography>
       <Box display={"grid"} gridTemplateColumns={"1fr 2fr 1fr"}>
         <Typography>Desc.</Typography>
-        <Typography align="center">ITBIS</Typography>
+        <Typography align="center">
+          {invoiceData.NCF && <Typography>ITBIS</Typography>}
+        </Typography>
         <Typography align="right">Valor</Typography>
       </Box>
       <Typography align="center">
@@ -86,9 +82,10 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
           <Box display={"grid"} gridTemplateColumns={"1fr 2fr 1fr"}>
             <Typography fontSize={"11px"}>1.00</Typography>
             <Typography align="center" fontSize={"11px"}>
-              {(
-                Math.round((product.price - product.price / 1.18) * 100) / 100
-              ).toLocaleString("en", { minimumFractionDigits: 2 })}
+              {invoiceData.NCF &&
+                (
+                  Math.round((product.price - product.price / 1.18) * 100) / 100
+                ).toLocaleString("en", { minimumFractionDigits: 2 })}
             </Typography>
             <Typography align="right" fontSize={"11px"}>
               {product.price.toLocaleString("en", {
@@ -104,13 +101,16 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
       {invoiceData.subtotal !== invoiceData.total && (
         <Box display={"grid"} gridTemplateColumns={"1.5fr 2fr 1.5fr"}>
           <Typography>Subtotal:</Typography>
+
           <Typography align="center">
-            {(
-              Math.round(
-                (invoiceData.subtotal - invoiceData.subtotal / 1.18) * 100
-              ) / 100
-            ).toLocaleString("en", { minimumFractionDigits: 2 })}
+            {invoiceData.NCF &&
+              (
+                Math.round(
+                  (invoiceData.subtotal - invoiceData.subtotal / 1.18) * 100
+                ) / 100
+              ).toLocaleString("en", { minimumFractionDigits: 2 })}
           </Typography>
+
           <Typography align="right">
             {invoiceData.subtotal.toLocaleString("en", {
               minimumFractionDigits: 2,
@@ -121,16 +121,20 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
 
       {invoiceData.discount > 0 && (
         <Box display={"grid"} gridTemplateColumns={"1.5fr 2fr 1.5fr"}>
-          <Typography>
+          <Typography fontSize={"12px"}>
             Dto.&#40;{invoiceData.discountPersentage}%&#41;:
           </Typography>
           <Typography align="center">
-            -
-            {(
-              Math.round(
-                (invoiceData.discount - invoiceData.discount / 1.18) * 100
-              ) / 100
-            ).toLocaleString("en", { minimumFractionDigits: 2 })}
+            {invoiceData.NCF && (
+              <Typography>
+                -
+                {(
+                  Math.round(
+                    (invoiceData.discount - invoiceData.discount / 1.18) * 100
+                  ) / 100
+                ).toLocaleString("en", { minimumFractionDigits: 2 })}
+              </Typography>
+            )}
           </Typography>
           <Typography align="right">
             -
@@ -156,10 +160,11 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
       <Box display={"grid"} gridTemplateColumns={"1.5fr 2fr 1.5fr"}>
         <Typography fontWeight={"bold"}>Total:</Typography>
         <Typography fontWeight={"bold"} align="center">
-          {(
-            Math.round((invoiceData.total - invoiceData.total / 1.18) * 100) /
-            100
-          ).toLocaleString("en", { minimumFractionDigits: 2 })}
+          {invoiceData.NCF &&
+            (
+              Math.round((invoiceData.total - invoiceData.total / 1.18) * 100) /
+              100
+            ).toLocaleString("en", { minimumFractionDigits: 2 })}
         </Typography>
         <Typography fontWeight={"bold"} align="right">
           {invoiceData.total.toLocaleString("en", {
@@ -193,10 +198,31 @@ const InvoiceReceipt = React.forwardRef(({ invoiceData }, ref) => {
         height={40}
         displayValue={false}
       />
-      <Typography fontSize={"10px"}>
-        Para cualquier reclamación de garantía, es indispensable presentar el
-        producto con su caja original y el recibo de compra.
-      </Typography>
+      {invoiceData.products.some((item) => item.warranty !== "") && (
+        <Box>
+          <Typography fontSize={"10px"}>
+            Para cualquier reclamación de garantía, es indispensable presentar
+            el producto con su caja original y el recibo de compra.
+          </Typography>
+          <p></p>
+          <Typography fontSize={"13px"} fontWeight={"bold"} align="center">
+            *Exclusiones de la Garantía*
+          </Typography>
+          <Typography fontSize={"10px"} fontWeight={"bold"}>
+            Daños por fallos eléctricos:
+          </Typography>
+          <Typography fontSize={"10px"}>
+            Incluye fluctuaciones de voltaje, cortes o descargas eléctricas.
+          </Typography>
+          <Typography fontSize={"10px"} fontWeight={"bold"}>
+            Daños causados por el usuario:
+          </Typography>
+          <Typography fontSize={"10px"}>
+            Uso indebido, negligencia, modificaciones o
+            reparaciones no autorizadas.
+          </Typography>
+        </Box>
+      )}
       <Typography fontWeight={"bold"} align="center" mt={1}>
         ¡Gracias por preferirnos!
       </Typography>

@@ -5,6 +5,7 @@ import {
   IconButton,
   InputBase,
   InputLabel,
+  MenuItem,
   Select,
   TextField,
   Typography,
@@ -77,11 +78,25 @@ const CreditNote = () => {
   });
 
   const _columns = [
-    { field: "id", headerName: "ID", flex: 1 },
-    { field: "barCode", headerName: "Código", flex: 1 },
+    {
+      field: "id",
+      headerName: "ID",
+      headerAlign: "center",
+      align: "center",
+      flex: 1,
+    },
+    {
+      field: "barCode",
+      headerName: "Código",
+      headerAlign: "center",
+      align: "center",
+      flex: 1,
+    },
     {
       field: "name",
       headerName: "Nombre",
+      headerAlign: "center",
+      align: "center",
       cellClassName: "name-column--cell",
       flex: 1,
     },
@@ -89,6 +104,8 @@ const CreditNote = () => {
       field: "returnReason",
       editable: true,
       headerName: "Razón",
+      headerAlign: "center",
+      align: "center",
       type: "singleSelect",
       valueOptions: ["Cambio", "Garantía"],
     },
@@ -167,7 +184,7 @@ const CreditNote = () => {
   };
 
   const getNextNCF = (_data) => {
-    if (_data.currentValue === null) return `B0${_data.startRange}`;
+    if (_data.currentValue === null) return _data.startRange;
 
     const endRangeInt = parseInt(_data.endRange);
     let nextValueInt = parseInt(_data.currentValue) + 1;
@@ -179,12 +196,11 @@ const CreditNote = () => {
         } numeros de comprobantes fiscales, por favor contacta al departamento administrativo.`
       );
     }
-    return `B0${nextValueInt}`;
+    return nextValueInt;
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    // Aquí puedes manejar la lógica de envío del formulario
 
     if (selectedProductList.length === 0) {
       alert("La nota de crédito debe tener al menos un producto");
@@ -205,7 +221,8 @@ const CreditNote = () => {
 
     if (formValues.invoiceNCF !== "" && formValues.id === "") {
       // get NCF y crear nota de creditos con NCF
-      await NcfAPI.getNcfByCode("B04") // Nota de Credito
+
+      await NcfAPI.getNcfByCode("B04") // Credito Fiscal
         .then((response) => {
           if (response !== undefined) {
             const NCF = getNextNCF(response);
@@ -216,7 +233,7 @@ const CreditNote = () => {
               submit = false;
             }
             if (submit) {
-              data.creditNoteNCF = NCF;
+              data.creditNoteNCF = `B0${NCF}`;
               response.currentValue = NCF;
               NcfAPI.update(response);
             }
@@ -386,11 +403,11 @@ const CreditNote = () => {
     let sum = 0;
     if (_data !== undefined) {
       _data.invoice_Products.forEach((invoice) => {
-        sum += invoice.subtotal;
+        sum += parseFloat(invoice.subtotal);
       });
     } else {
       selectedProductList.forEach((invoice) => {
-        sum += invoice.subtotal;
+        sum += parseFloat(invoice.subtotal);
       });
     }
 
@@ -417,6 +434,14 @@ const CreditNote = () => {
     );
 
     return creditNoteNumber;
+  };
+
+  const searchCreditNote = (e) => {
+    if (e.key !== "Enter" || e.keyCode !== 13) {
+      return;
+    }
+
+    getCreditNoteByCreditNoteNumber();
   };
 
   const getCreditNoteByCreditNoteNumber = (e) => {
@@ -541,6 +566,7 @@ const CreditNote = () => {
               placeholder="Buscar nota de crédito"
               onChange={handleInputChange}
               value={formValues.searchCreditNoteParam || ""}
+              onKeyUp={(e) => searchCreditNote(e)}
             />
             <IconButton type="button" onClick={getCreditNoteByCreditNoteNumber}>
               {formValues.id !== "" ? <CancelIcon /> : <SearchIcon />}
@@ -587,6 +613,20 @@ const CreditNote = () => {
           isRowSelectable={(params) => params.row.creditNoteNumber === ""}
           isCellEditable={(params) => params.row.creditNoteNumber === ""}
           onCellEditCommit={handleProcessRowUpdate}
+          getCellClassName={(params) => {
+            return params.field === "returnReason" &&
+              params.formattedValue === ""
+              ? "notSelected"
+              : "";
+          }}
+          sx={{
+            ".notSelected": {
+              bgcolor: `${colors.greenAccent[700]}`,
+              "&:before": {
+                content: '"Seleccionar..."',
+              },
+            },
+          }}
           checkboxSelection
           disableSelectionOnClick
           onSelectionModelChange={(ids) => {

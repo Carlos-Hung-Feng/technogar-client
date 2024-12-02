@@ -74,13 +74,31 @@ const Product = () => {
           setPreview(response.oldImageUrl);
           setProductOldName(response.name);
         })
-        .catch((err) => console.error("No se pudo obtener el producto", err));
+        .catch((err) => {
+          alert(
+            "Presentó un error y no se pudo obtener el producto, por favor contacta con el departamente administrativo."
+          );
+          navigate("/inventory");
+          console.error("No se pudo obtener el producto", err);
+        });
     }
   }, [id]);
+
+  const searchProduct = (e) => {
+    if (e.key !== "Enter" || e.keyCode !== 13) {
+      return;
+    }
+
+    getProductByBarCode();
+  };
 
   const getProductByBarCode = () => {
     ProductAPI.getProductByBarCode(formValues.searchProductParam)
       .then((response) => {
+        if (response === undefined) {
+          alert("Producto no encontrado, por favor intente de nuevo.");
+          return;
+        }
         setFormValues(response);
         setPreview(response.oldImageUrl);
         setProductOldName(response.name);
@@ -203,9 +221,10 @@ const Product = () => {
           <InputBase
             sx={{ ml: 1, flex: 1 }}
             name="searchProductParam"
-            placeholder="Buscar orden"
+            placeholder="Buscar producto"
             onChange={handleInputChange}
             value={formValues.searchProductParam || ""}
+            onKeyUp={(e) => searchProduct(e)}
           />
           <IconButton type="button" onClick={getProductByBarCode}>
             <SearchIcon />
@@ -414,18 +433,18 @@ const Product = () => {
                 <TextField
                   variant="filled"
                   type="number"
-                  label="Precio al detalle"
-                  name="retailPrice"
-                  value={formValues.retailPrice}
+                  label="Precio al por mayor"
+                  name="wholesalePrice"
+                  value={formValues.wholesalePrice}
                   onChange={handleInputChange}
                   required
                 />
                 <TextField
                   variant="filled"
                   type="number"
-                  label="Precio al por mayor"
-                  name="wholesalePrice"
-                  value={formValues.wholesalePrice}
+                  label="Precio al detalle"
+                  name="retailPrice"
+                  value={formValues.retailPrice}
                   onChange={handleInputChange}
                   required
                 />

@@ -91,21 +91,6 @@ const Inventory = () => {
       flex: 1,
     },
     {
-      field: "RetailPrice",
-      headerName: "Al detalle",
-      width: 100,
-      headerAlign: "center",
-      align: "center",
-      renderCell: ({ row: { RetailPrice } }) => {
-        return (
-          <Typography color={colors.greenAccent[500]}>
-            ${RetailPrice}
-          </Typography>
-        );
-      },
-      flex: 1,
-    },
-    {
       field: "WholesalePrice",
       headerName: "Al por mayor",
       width: 100,
@@ -115,6 +100,21 @@ const Inventory = () => {
         return (
           <Typography color={colors.blueAccent[500]}>
             ${WholesalePrice}
+          </Typography>
+        );
+      },
+      flex: 1,
+    },
+    {
+      field: "RetailPrice",
+      headerName: "Al detalle",
+      width: 100,
+      headerAlign: "center",
+      align: "center",
+      renderCell: ({ row: { RetailPrice } }) => {
+        return (
+          <Typography color={colors.greenAccent[500]}>
+            ${RetailPrice}
           </Typography>
         );
       },
@@ -194,6 +194,7 @@ const Inventory = () => {
         }}
       >
         <DataGrid
+          pagination
           rows={productList}
           columns={_columns}
           columnVisibilityModel={columnVisibilityModel}

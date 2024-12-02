@@ -145,6 +145,14 @@ const Customer = () => {
     });
   };
 
+  const searchClient = (e) => {
+    if (e.key !== "Enter" || e.keyCode !== 13) {
+      return;
+    }
+
+    getClientByIdentifier();
+  };
+
   const getClientByIdentifier = () => {
     ClientAPI.getClientByIdentifier(formValues.searchClientParam)
       .then((response) => {
@@ -212,6 +220,7 @@ const Customer = () => {
             onChange={handleInputChange}
             name="searchClientParam"
             value={formValues.searchClientParam || ""}
+            onKeyUp={searchClient}
           />
           <IconButton type="button" onClick={getClientByIdentifier}>
             <SearchIcon />

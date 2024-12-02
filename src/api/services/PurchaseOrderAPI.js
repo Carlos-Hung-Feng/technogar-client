@@ -136,6 +136,17 @@ export const PurchaseOrderAPI = {
         .then(response => response.data)
         .catch(error => { throw error; });
     },
+    getOrderProductsByProductID: function (_productId) {
+        return instance.request({
+        url: `/purchase-order-products?filters[Product][id][$eq]=${_productId}`,
+        method: 'GET',
+        })
+        .then(response => {
+            
+            return response.data.data;
+        })
+        .catch(error => { throw error; });
+    },
     addOrderProduct: function(_orderId, _product) {
         let data = {
             'data': {

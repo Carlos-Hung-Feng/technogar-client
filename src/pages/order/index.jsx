@@ -255,6 +255,14 @@ const Order = () => {
     );
   };
 
+  const searchPurchaseOrder = (e) => {
+    if (e.key !== "Enter" || e.keyCode !== 13) {
+      return;
+    }
+
+    getOrderByOrderNumber();
+  };
+
   const getOrderByOrderNumber = () => {
     PurchaseOrderAPI.getOrderByOrderNumber(formValues.searchPurchaseOrderParam)
       .then((response) => {
@@ -291,6 +299,28 @@ const Order = () => {
       subtotal: _quantity * _cost,
     };
 
+    if (addedProductList.find((x) => x.productId === _orderProduct.productId)) {
+      if (formValues.id !== "" && productButtonText === "AGREGAR PRODUCTO") {
+        alert("Producto ya registrado en lista, por favor editar en la lista.");
+        setFormValues({ ...formValues, product: null, quantity: "", cost: "" });
+        setProductButtonText("AGREGAR PRODUCTO");
+        return;
+      }
+      let updatedList = addedProductList.map((item) =>
+        item.productId === _orderProduct.productId
+          ? {
+              ...item,
+              quantity: _quantity,
+              cost: _cost,
+              subtotal: _quantity * _cost,
+            }
+          : item
+      );
+      setAddedProductList(updatedList);
+    } else {
+      setAddedProductList([...addedProductList, orderProduct]);
+    }
+
     if (formValues.id !== "") {
       if (productButtonText === "AGREGAR PRODUCTO") {
         savePurchaseOrderProduct(
@@ -313,14 +343,14 @@ const Order = () => {
                   product: warehouse.data[0].attributes.Product.data.id,
                   quantity: warehouse.data[0].attributes.Quantity + quantity,
                 };
-                WarehouseAPI.update(inventory);
+                WarehouseAPI.updateInventory(inventory);
               } else {
                 let inventory = {
                   warehouse: formValues.warehouse,
                   product: _orderProduct.productId,
                   quantity: _orderProduct.quantity,
                 };
-                WarehouseAPI.create(inventory);
+                WarehouseAPI.createInventory(inventory);
               }
             });
           }
@@ -328,25 +358,8 @@ const Order = () => {
       }
     }
 
-    if (addedProductList.find((x) => x.id === _orderProduct.id)) {
-      let updatedList = addedProductList.map((item) =>
-        item.productId === _orderProduct.productId
-          ? {
-              ...item,
-              quantity: _quantity,
-              cost: _cost,
-              subtotal: _quantity * _cost,
-            }
-          : item
-      );
-      setAddedProductList(updatedList);
-      setFormValues({ ...formValues, product: null, quantity: "", cost: "" });
-      setProductButtonText("AGREGAR PRODUCTO");
-    } else {
-      setAddedProductList([...addedProductList, orderProduct]);
-      setFormValues({ ...formValues, product: null, quantity: "", cost: "" });
-      setProductButtonText("AGREGAR PRODUCTO");
-    }
+    setFormValues({ ...formValues, product: null, quantity: "", cost: "" });
+    setProductButtonText("AGREGAR PRODUCTO");
   };
 
   const deleteProduct = (_orderProduct) => {
@@ -362,7 +375,7 @@ const Order = () => {
           quantity:
             data.data[0].attributes.Quantity - _orderProduct.row.quantity,
         };
-        WarehouseAPI.update(updatedInventory).then((data) => {
+        WarehouseAPI.updateInventory(updatedInventory).then((data) => {
           PurchaseOrderAPI.deleteOrderProduct(_orderProduct.row.id);
         });
       });
@@ -479,6 +492,7 @@ const Order = () => {
             placeholder="Buscar orden"
             onChange={handleInputChange}
             value={formValues.searchPurchaseOrderParam || ""}
+            onKeyUp={(e) => searchPurchaseOrder(e)}
           />
           <IconButton type="button" onClick={getOrderByOrderNumber}>
             <SearchIcon />
@@ -814,8 +828,6 @@ const Order = () => {
                 <DataGrid
                   rows={addedProductList}
                   columns={COLUMNS}
-                  pageSize={5}
-                  rowsPerPageOptions={[5]}
                   disableSelectionOnClick
                 />
               </Box>

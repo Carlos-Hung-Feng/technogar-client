@@ -12,11 +12,14 @@ import {
   Typography,
   useTheme,
   Tooltip,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 import { DataGrid, GridActionsCellItem } from "@mui/x-data-grid";
 import { tokens } from "../../theme";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import PointOfSaleOutlinedIcon from "@mui/icons-material/PointOfSaleOutlined";
+import DriveFileRenameOutlineOutlinedIcon from "@mui/icons-material/DriveFileRenameOutlineOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CancelIcon from "@mui/icons-material/Cancel";
@@ -34,11 +37,15 @@ import { CreditNoteAPI } from "../../api/services/CreditNoteAPI";
 import CashCountReceipt from "../../components/CashCountReceipt";
 import CustomModal from "../../components/CustomModal";
 import { NcfAPI } from "../../api/services/NcfAPI";
+import { PurchaseOrderAPI } from "../../api/services/PurchaseOrderAPI";
 
 const Invoices = () => {
   const theme = useTheme();
   const colors = tokens(theme.palette.mode);
-  const [openModal, setOpenModal] = useState(false);
+  const [openCashCountModal, setOpenCashCountModal] = useState(false);
+  const [openCancelInvoiceModal, setOpenCancelInvoiceModal] = useState(false);
+  const [customizeProductPriceModal, setCustomizeProductPriceModal] =
+    useState(false);
 
   const [paymentMethodList, setPaymentMethodList] = useState([]);
   const [discountList, setDiscountList] = useState([]);
@@ -46,6 +53,7 @@ const Invoices = () => {
 
   const [columnVisibilityModel, setColumnVisibilityModel] = useState({
     id: false,
+    warranty: false,
   });
 
   const [client, setClient] = useState({
@@ -72,6 +80,7 @@ const Invoices = () => {
     paidWith: "",
     returned: 0,
     status: "",
+    productCustomPrice: "",
     paymentMethodId: "",
     customerId: "",
     billedById: "",
@@ -79,6 +88,7 @@ const Invoices = () => {
     creditNoteAppliedId: "",
     creditNoteAppliedNumber: "",
     creditNoteAppliedValue: 0,
+    delivery: false,
     total: 0,
     createdAt: new Date(),
 
@@ -139,22 +149,27 @@ const Invoices = () => {
   }, []);
 
   const handleInputChange = (event) => {
-    const { name, value } = event.target;
-    setFormValues({ ...formValues, [name]: value });
+    const { name, value, type, checked } = event.target;
+    const newValue = type === "checkbox" ? checked : value;
+    setFormValues({ ...formValues, [name]: newValue });
 
-    name === "paidWith" ?? calculateChange(value);
+    name === "paidWith" ?? calculateChange(newValue);
     name === "discountId" ?? calculateTotal();
 
     if (name === "paymentMethodId") {
-      if (value !== 1) {
-        setFormValues({ ...formValues, paymentMethodId: value, paidWith: "" });
+      if (newValue !== 1) {
+        setFormValues({
+          ...formValues,
+          paymentMethodId: newValue,
+          paidWith: "",
+        });
       }
     }
   };
 
-  const handleSubmitModal = () => {
+  const handleSubmitCashCountModal = () => {
     handlePrintCashCount();
-    setOpenModal(false);
+    setOpenCashCountModal(false);
   };
 
   const getCashCount = () => {
@@ -163,7 +178,7 @@ const Invoices = () => {
       today.getMonth() + 1 > 9
         ? today.getMonth() + 1
         : "0" + (today.getMonth() + 1)
-    }-${today.getDate()}`;
+    }-${today.getDate() > 9 ? today.getDate() : "0" + today.getDate()}`;
     InvoiceAPI.getInvoiceTotal(todayString).then((data) => {
       const invoiceGroupedByPaymentJson = Object.groupBy(
         data,
@@ -197,7 +212,7 @@ const Invoices = () => {
         invoiceCount: cashCountList,
       });
     });
-    setOpenModal(true);
+    setOpenCashCountModal(true);
     //handlePrintCashCount();
   };
 
@@ -217,7 +232,6 @@ const Invoices = () => {
   };
 
   const getNextNCF = (_data) => {
-    console.log(_data);
     if (_data.currentValue === null) return _data.startRange;
 
     const endRangeInt = parseInt(_data.endRange);
@@ -246,13 +260,12 @@ const Invoices = () => {
     }
 
     let total = calculateTotal();
-
     let data = {
       ...formValues,
       clientName: client.fullName,
       invoiceNumber: invoiceNumberGenerator(),
       returned: formValues.paidWith - total,
-      status: "Paid",
+      status: formValues.delivery ? "Pending" : "Paid",
       createdAt: new Date(),
       total: total,
       billedById: parseInt(localStorage.getItem("userId")),
@@ -308,8 +321,22 @@ const Invoices = () => {
             console.error("No se pudo obtener NCF para la factura", err);
           });
       } else {
+        // // 1 - Eefectivo; 2 - Tarjeta; 3 - Transferencia
+        // if (Math.random() <= 0.1) {
+        //   await NcfAPI.getNcfByCode("B02") // Consumidor Final
+        //     .then((response) => {
+        //       if (response !== undefined) {
+        //         const NCF = getNextNCF(response);
+        //         if (NCF !== null) {
+        //           data.NCF = `B0${NCF}`;
+        //           response.currentValue = NCF;
+        //           NcfAPI.update(response);
+        //         }
+        //       }
+        //     });
+        // }
         if (formValues.paymentMethodId === 2) {
-          // 1 - Tarjeta
+          // 2 - Tarjeta
           await NcfAPI.getNcfByCode("B02") // Consumidor Final
             .then((response) => {
               if (response !== undefined) {
@@ -337,22 +364,23 @@ const Invoices = () => {
               alert("No se pudo obtener NCF para la factura");
               console.error("No se pudo obtener NCF para la factura", err);
             });
-        } else {
-          // 1 - Eefectivo; 3 - Transferencia
-          if (Math.random() <= 0.1) {
-            await NcfAPI.getNcfByCode("B02") // Consumidor Final
-              .then((response) => {
-                if (response !== undefined) {
-                  const NCF = getNextNCF(response);
-                  if (NCF !== null) {
-                    data.NCF = `B0${NCF}`;
-                    response.currentValue = NCF;
-                    NcfAPI.update(response);
-                  }
-                }
-              });
-          }
         }
+        // else {
+        //   // 1 - Eefectivo; 3 - Transferencia
+        //   if (Math.random() <= 0.2) {
+        //     await NcfAPI.getNcfByCode("B02") // Consumidor Final
+        //       .then((response) => {
+        //         if (response !== undefined) {
+        //           const NCF = getNextNCF(response);
+        //           if (NCF !== null) {
+        //             data.NCF = `B0${NCF}`;
+        //             response.currentValue = NCF;
+        //             NcfAPI.update(response);
+        //           }
+        //         }
+        //       });
+        //   }
+        // }
       }
     }
 
@@ -369,9 +397,38 @@ const Invoices = () => {
               };
               CreditNoteAPI.update(creditNote);
             }
-
             addedProductList.forEach((product) => {
-              InvoiceAPI.addInvoiceProduct(response.data.id, product);
+              let totalPurchased = 0;
+              let totalSold = 0;
+              let productList = [];
+              PurchaseOrderAPI.getOrderProductsByProductID(product.productId)
+                .then((orderproductList) => {
+                  productList = [...orderproductList];
+                })
+                .then(() => {
+                  InvoiceAPI.getInvoiceProductsTotalByProductID(
+                    product.productId
+                  )
+                    .then((total) => {
+                      totalSold = total;
+                    })
+                    .then(() => {
+                      for (let i = 0; i < productList.length; i++) {
+                        if (
+                          totalSold - totalPurchased >
+                          productList[i].attributes.Quantity
+                        ) {
+                          totalPurchased += productList[i].attributes.Quantity;
+                        } else {
+                          product.cost = productList[i].attributes.Price;
+                          break;
+                        }
+                      }
+                    })
+                    .then(() => {
+                      InvoiceAPI.addInvoiceProduct(response.data.id, product);
+                    });
+                });
             });
             let productsGroupedJson = Object.groupBy(
               addedProductList,
@@ -405,83 +462,107 @@ const Invoices = () => {
         handlePrintInvoice();
         clearInputs(data.invoiceNumber);
       } else {
-        let cancelInvoice = true;
-        if (formValues.NCF !== "") {
-          const NCF = parseInt(formValues.NCF.split("B")[1]);
-          await NcfAPI.getNfcByNCF(NCF) // Nota de Credito
-            .then((response) => {
-              if (response !== undefined) {
-                if (NCF !== response.currentValue) {
-                  alert("No se puede anular Factura con NCF.");
-                  cancelInvoice = false;
-                }
-
-                if (cancelInvoice) {
-                  response.currentValue = response.currentValue - 1;
-                  NcfAPI.update(response);
-                }
-              } else {
-                alert(
-                  "NCF no encontrada, por favor contactar con el departamento administrativo"
-                );
-              }
-            })
-            .catch((err) => {
-              alert("No se pudo obtener NCF para la factura.");
-              console.error("No se pudo obtener NCF para la factura.", err);
-            });
-        }
-        if (cancelInvoice) {
-          data.status = "Canceled";
-          InvoiceAPI.update(data)
-            .then((data) => {
-              let productsGroupedJson = Object.groupBy(
-                addedProductList,
-                ({ productId }) => productId
-              );
-
-              for (let i in productsGroupedJson) {
-                WarehouseAPI.getByWarehouseIdAndProductId(
-                  1, // por ahora solo tenemos un almacen, y el usuario no esta relacionado con almacen (algo como sucursal, caja, etc.).
-                  i
-                ).then((warehouse) => {
-                  if (warehouse.data.length > 0) {
-                    let inventory = {
-                      id: warehouse.data[0].id,
-                      quantity:
-                        parseInt(warehouse.data[0].attributes.Quantity) +
-                        productsGroupedJson[i].length,
-                    };
-                    WarehouseAPI.updateInventory(inventory);
-                    setFormValues({
-                      ...formValues,
-                      status: "Canceled",
-                    });
-                  } else {
-                    alert("Inventario no suficiente");
-                  }
-                });
-              }
-              alert("Factura anulada exitosamente.");
-            })
-            .catch((err) => {
-              alert("No se pudo anular la factura");
-              console.error(err);
-            });
-        }
+        setOpenCancelInvoiceModal(true);
       }
     }
+  };
+
+  // const test = () => {
+  //   let productList = [];
+  //   PurchaseOrderAPI.getOrderProductsByProductID(5)
+  //     .then((orderproductList) => {
+  //       console.log(orderproductList);
+  //       productList = [...orderproductList];
+  //     })
+  //     .then(() => {
+  //       console.log("prueba", productList);
+  //       InvoiceAPI.getInvoiceProductsTotalByProductID(5).then((total) => {
+  //         console.log("total vendido", total);
+  //       });
+  //     });
+  // };
+
+  const handleSubmitCancelInvoiceModal = async () => {
+    let data = {
+      ...formValues,
+    };
+
+    let cancelInvoice = true;
+    if (formValues.NCF !== "") {
+      const NCF = parseInt(formValues.NCF.split("B")[1]);
+      await NcfAPI.getNfcByNCF(NCF) // Nota de Credito
+        .then((response) => {
+          if (response !== undefined) {
+            if (NCF !== response.currentValue) {
+              alert("No se puede anular Factura con NCF.");
+              cancelInvoice = false;
+            }
+
+            if (cancelInvoice) {
+              response.currentValue = response.currentValue - 1;
+              NcfAPI.update(response);
+            }
+          } else {
+            alert(
+              "NCF no encontrada, por favor contactar con el departamento administrativo"
+            );
+          }
+        })
+        .catch((err) => {
+          alert("No se pudo obtener NCF para la factura.");
+          console.error("No se pudo obtener NCF para la factura.", err);
+        });
+    }
+    if (cancelInvoice) {
+      data.status = "Canceled";
+      InvoiceAPI.update(data)
+        .then((data) => {
+          let productsGroupedJson = Object.groupBy(
+            addedProductList,
+            ({ productId }) => productId
+          );
+
+          for (let i in productsGroupedJson) {
+            WarehouseAPI.getByWarehouseIdAndProductId(
+              1, // por ahora solo tenemos un almacen, y el usuario no esta relacionado con almacen (algo como sucursal, caja, etc.).
+              i
+            ).then((warehouse) => {
+              if (warehouse.data.length > 0) {
+                let inventory = {
+                  id: warehouse.data[0].id,
+                  quantity:
+                    parseInt(warehouse.data[0].attributes.Quantity) +
+                    productsGroupedJson[i].length,
+                };
+                WarehouseAPI.updateInventory(inventory);
+                setFormValues({
+                  ...formValues,
+                  status: "Canceled",
+                });
+              } else {
+                alert("Inventario no suficiente");
+              }
+            });
+          }
+          alert("Factura anulada exitosamente.");
+        })
+        .catch((err) => {
+          alert("No se pudo anular la factura");
+          console.error(err);
+        });
+    }
+    setOpenCancelInvoiceModal(false);
   };
 
   const generateReceipt = async (_data, _isCopy = false) => {
     let sum = 0;
     if (_data.invoice_Products !== undefined) {
       _data.invoice_Products.forEach((invoice) => {
-        sum += invoice.price;
+        sum += parseFloat(invoice.price);
       });
     } else {
       addedProductList.forEach((invoice) => {
-        sum += invoice.price;
+        sum += parseFloat(invoice.price);
       });
     }
 
@@ -537,7 +618,7 @@ const Invoices = () => {
             setFormValues(invoiceResponse);
             setAddedProductList(invoiceResponse.invoice_Products);
 
-            if (invoiceResponse.searchClientParam !== "") {
+            if (invoiceResponse.searchClientParam) {
               ClientAPI.getClientByCustomerCode(
                 invoiceResponse.searchClientParam
               )
@@ -636,6 +717,7 @@ const Invoices = () => {
       creditNoteAppliedValue: 0,
 
       productBarCode: "",
+      productCustomPrice: "",
 
       searchInvoiceParam: _searchInvoiceParam,
       searchClientParam: "",
@@ -701,6 +783,22 @@ const Invoices = () => {
     });
   };
 
+  const addClientToInvoice = (e) => {
+    if (e.key !== "Enter" || e.keyCode !== 13) {
+      return;
+    }
+
+    getClientByCustomerCode();
+  };
+
+  const searchInvoice = (e) => {
+    if (e.key !== "Enter" || e.keyCode !== 13) {
+      return;
+    }
+
+    getInvoiceByInvoiceNumber();
+  };
+
   const addProduct = (e) => {
     if (e.key !== "Enter" || e.keyCode !== 13) {
       return;
@@ -730,13 +828,23 @@ const Invoices = () => {
           barCode: data.barCode,
           name: data.name,
           description: data.description,
-          price: price,
+          price:
+            formValues.productCustomPrice !== ""
+              ? parseFloat(formValues.productCustomPrice)
+              : price,
+          warranty: data.warranty,
         };
 
         // check inventory
         WarehouseAPI.getByWarehouseIdAndProductId(1, product.productId).then(
           (data) => {
-            if (data.data[0].attributes.Quantity <= quantity + 1) {
+            if (data.data.length <= 0) {
+              alert(
+                "Inventario insuficiente. Por favor, revise la disponibilidad."
+              );
+              return;
+            }
+            if (data.data[0].attributes.Quantity <= quantity) {
               alert(
                 "Inventario insuficiente. Por favor, revise la disponibilidad."
               );
@@ -748,7 +856,7 @@ const Invoices = () => {
         );
       })
       .catch((err) => {
-        alert("No se pudo obtener los productos, por favor intenta de nueve");
+        alert("No se pudo obtener los productos, por favor intenta de nuevo");
         console.error("No se pudo obtener los productos", err);
       });
 
@@ -767,6 +875,7 @@ const Invoices = () => {
     setFormValues({
       ...formValues,
       productBarCode: "",
+      productCustomPrice: "",
     });
   };
 
@@ -784,6 +893,7 @@ const Invoices = () => {
       headerName: "Descripción",
       width: 500,
     },
+    { field: "warranty", headerName: "Garrantía", flex: 1 },
     {
       field: "price",
       headerName: "Precio",
@@ -817,7 +927,7 @@ const Invoices = () => {
 
     if (_data !== undefined) {
       _data.invoice_Products.forEach((invoice) => {
-        sum += invoice.price;
+        sum += parseFloat(invoice.price);
       });
       if (_data.discountId !== "") {
         let discount =
@@ -827,7 +937,7 @@ const Invoices = () => {
       }
     } else {
       addedProductList.forEach((invoice) => {
-        sum += invoice.price;
+        sum += parseFloat(invoice.price);
       });
       if (formValues.discountId !== "") {
         let discount =
@@ -860,12 +970,12 @@ const Invoices = () => {
             title="Facturar"
             subtitle={
               client.id === ""
-                ? "Solicitar RNC o informacion del cliente antes de la facturación."
+                ? "Solicitar RNC o informacion del cliente primero."
                 : `${client.identifier} - ${client.fullName}`
             }
           />
 
-          <Box display={"flex"} gap={2} justifyContent={"end"}>
+          <Box display={"flex"} gap={1} justifyContent={"end"}>
             <Box
               display="flex"
               backgroundColor={colors.primary[400]}
@@ -879,6 +989,7 @@ const Invoices = () => {
                 onChange={handleInputChange}
                 value={formValues.searchClientParam || ""}
                 inputProps={formValues.id !== "" ? { readOnly: true } : {}}
+                onKeyUp={(e) => addClientToInvoice(e)}
               />
               <IconButton
                 type="button"
@@ -916,6 +1027,28 @@ const Invoices = () => {
                 <SearchIcon />
               </IconButton>
             </Box>
+            <Box
+              display="flex"
+              backgroundColor={colors.primary[400]}
+              p={0.2}
+              borderRadius={2}
+              paddingRight={2}
+            >
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    color="secondary"
+                    id="ckbDelivery"
+                    name="delivery"
+                    value={formValues.delivery || false}
+                    onChange={handleInputChange}
+                    inputProps={formValues.id !== "" ? { disabled: true } : {}}
+                  />
+                }
+                label="Envío"
+                labelPlacement="start"
+              />
+            </Box>
           </Box>
         </Box>
         <Box display="flex" justifyContent={"end"} alignItems={"center"}>
@@ -933,6 +1066,7 @@ const Invoices = () => {
               placeholder="Buscar factura"
               onChange={handleInputChange}
               value={formValues.searchInvoiceParam || ""}
+              onKeyUp={searchInvoice}
             />
             <IconButton type="button" onClick={getInvoiceByInvoiceNumber}>
               {formValues.id !== "" ? <CancelIcon /> : <SearchIcon />}
@@ -973,6 +1107,7 @@ const Invoices = () => {
         }}
       >
         <DataGrid
+          pagination
           rows={addedProductList}
           columns={_columns}
           columnVisibilityModel={columnVisibilityModel}
@@ -1020,19 +1155,26 @@ const Invoices = () => {
                 <CustomModal
                   buttonIcon={<PointOfSaleOutlinedIcon />}
                   onClick={getCashCount}
-                  open={openModal}
-                  setOpen={setOpenModal}
+                  open={openCashCountModal}
+                  setOpen={setOpenCashCountModal}
                   message={{
                     header: "Cierre de caja",
-                    body: "Estas seguro que deseas cerrar la caja?",
+                    body: (
+                      <Typography
+                        id="modal-modal-description"
+                        fontSize={"20px"}
+                      >
+                        Estas seguro que deseas cerrar la caja?
+                      </Typography>
+                    ),
                   }}
-                  onSubmit={handleSubmitModal}
-                  submitButtonText="Cerrar Caja"
+                  onClickButton_1={handleSubmitCashCountModal}
+                  buttonText_1="Cerrar Caja"
                 />
               )}
             </Box>
             <TextField
-              id="txtProductBarCodde"
+              id="txtProductBarCode"
               name="productBarCode"
               fullWidth
               type="text"
@@ -1041,6 +1183,18 @@ const Invoices = () => {
               value={formValues.productBarCode || ""}
               onChange={handleInputChange}
               onKeyUp={(e) => addProduct(e)}
+              sx={{ marginTop: "15px" }}
+              inputProps={formValues.id !== "" ? { readOnly: true } : {}}
+            />
+            <TextField
+              id="txtProductCustomPrice"
+              name="productCustomPrice"
+              fullWidth
+              type="number"
+              label="Precio Customizado"
+              variant="filled"
+              value={formValues.productCustomPrice || ""}
+              onChange={handleInputChange}
               sx={{ marginTop: "15px" }}
               inputProps={formValues.id !== "" ? { readOnly: true } : {}}
             />
@@ -1186,6 +1340,9 @@ const Invoices = () => {
                   inputProps={formValues.id !== "" ? { readOnly: true } : {}}
                 />
               )}
+              {/* <Button variant="contained" onClick={test}>
+                test
+              </Button> */}
               <Button
                 type="submit"
                 color={formValues.id === "" ? "secondary" : "error"}
@@ -1203,10 +1360,21 @@ const Invoices = () => {
                   ? "Anular"
                   : formValues.status === "Canceled"
                   ? "Anulada"
-                  : "Nota de Crédito Generada"}
+                  : "Factura Pendiente"}
               </Button>
             </form>
           </Box>
+          <CustomModal
+            open={openCancelInvoiceModal}
+            setOpen={setOpenCancelInvoiceModal}
+            message={{
+              header: "Anular Factura",
+              body: "Estas seguro que deseas anular la factura?",
+            }}
+            onClickButton_1={handleSubmitCancelInvoiceModal}
+            buttonText_1="Anular Factura"
+            buttonColor_1="error"
+          />
           <Box display={"none"}>
             <InvoiceReceipt ref={invoiceReceiptRef} invoiceData={invoiceData} />
             <CashCountReceipt

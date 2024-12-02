@@ -11,7 +11,8 @@ import Product from "./pages/product";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./pages/login/authContext";
 import CreditNote from "./pages/creditNote";
-import Report from "./pages/report";
+import Delivery from "./pages/pendingInvoices";
+import PendingInvoice from "./pages/pendingInvoices";
 
 const App = () => {
   const [theme, colorMode] = useMode();
@@ -29,13 +30,13 @@ const App = () => {
                   <Route path="/login" element={<Login />} />
                   <Route element={<ProtectedRoute />}>
                     <Route path="/" element={<Invoices />} />
+                    <Route path="/pending" element={<PendingInvoice />} />
                     <Route path="/credit-note" element={<CreditNote />} />
                     <Route path="/customer" element={<Customer />} />
                     <Route path="/order" element={<Order />} />
                     <Route path="/inventory" element={<Inventory />} />
                     <Route path="/product" element={<Product />} />
                     <Route path="/product/:id" element={<Product />} />
-                    <Route path="/report" element={<Report />} />
                   </Route>
                 </Routes>
               </main>

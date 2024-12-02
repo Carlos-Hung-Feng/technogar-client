@@ -79,7 +79,9 @@ const CreditNoteReceipt = React.forwardRef(({ invoiceData }, ref) => {
       </Typography>
       <Box display={"grid"} gridTemplateColumns={"1fr 2fr 1fr"}>
         <Typography>Precio</Typography>
-        <Typography align="center">ITBIS</Typography>
+        <Typography align="center">
+          {invoiceData.invoiceNCF && <>ITBIS</>}
+        </Typography>
         <Typography align="right">Valor*</Typography>
       </Box>
       <Typography align="center">
@@ -98,11 +100,14 @@ const CreditNoteReceipt = React.forwardRef(({ invoiceData }, ref) => {
               {product.price.toLocaleString("en", { minimumFractionDigits: 2 })}
             </Typography>
             <Typography align="center" fontSize={"11px"}>
-              {(
-                Math.round((product.subtotal - product.subtotal / 1.18) * 100) /
-                100
-              ).toLocaleString("en", { minimumFractionDigits: 2 })}
+              {invoiceData.invoiceNCF &&
+                (
+                  Math.round(
+                    (product.subtotal - product.subtotal / 1.18) * 100
+                  ) / 100
+                ).toLocaleString("en", { minimumFractionDigits: 2 })}
             </Typography>
+
             <Typography align="right" fontSize={"11px"}>
               {product.subtotal.toLocaleString("en", {
                 minimumFractionDigits: 2,
@@ -121,11 +126,13 @@ const CreditNoteReceipt = React.forwardRef(({ invoiceData }, ref) => {
       >
         <Typography fontWeight={"bold"}>Total:</Typography>
         <Typography align="center" fontWeight={"bold"} fontSize={"11px"}>
-          {(
-            Math.round((invoiceData.total - invoiceData.total / 1.18) * 100) /
-            100
-          ).toLocaleString("en", { minimumFractionDigits: 2 })}
+          {invoiceData.invoiceNCF &&
+            (
+              Math.round((invoiceData.total - invoiceData.total / 1.18) * 100) /
+              100
+            ).toLocaleString("en", { minimumFractionDigits: 2 })}
         </Typography>
+
         <Typography fontWeight={"bold"} align="right">
           {invoiceData.total.toLocaleString("en", { minimumFractionDigits: 2 })}
         </Typography>

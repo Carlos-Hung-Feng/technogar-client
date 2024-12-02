@@ -3,7 +3,7 @@ import instance from '../axios';
 export const InvoiceAPI = {
     getInvoiceTotal: function (_today) {
         return instance.request({
-        url: `/invoices?filters[createdAt][$gte]=${_today}&filters[Status][$ne]=Canceled&[fields]0]=Total&populate[Payment_Method][fields][0]=id&populate[Payment_Method][fields][1]=Name`,
+        url: `/invoices?filters[createdAt][$gte]=${_today}&filters[Status][$eq]=Paid&[fields]0]=Total&populate[Payment_Method][fields][0]=id&populate[Payment_Method][fields][1]=Name`,
         method: 'GET',
         })
         .then(response => {
@@ -18,7 +18,7 @@ export const InvoiceAPI = {
     },
     getNCFInvoicesByDates: function (_date1, _date2) {
         return instance.request({
-        url: `/invoices?filters[createdAt][$gte]=${_date1}&[createdAt][$lte]=${_date2}&filters[Status][$ne]=Canceled&filters[NCF][$null]&[fields]0]=NCF&[fields]1]=Total&[fields]1]=createdAt&sort[0]=NCF`,
+        url: `/invoices?filters[createdAt][$gte]=${_date1}&[createdAt][$lte]=${_date2}&filters[Status][$eq]=Paid&filters[NCF][$null]&[fields]0]=NCF&[fields]1]=Total&[fields]1]=createdAt&sort[0]=NCF`,
         method: 'GET',
         })
         .then(response => {
@@ -32,6 +32,31 @@ export const InvoiceAPI = {
                 CreatedAt: new Date(invoice.attributes.createdAt).toLocaleString(),
             }))
             return dataList;
+        })
+        .catch(error => { throw error; });
+    },
+    getInvoiceById: function (_id) {
+        return instance.request({
+        
+        url: `/invoices/${_id}?populate[Payment_Method][fields][0]=id`,
+        method: 'GET',
+        })
+        .then(response => {
+            let invoice = response.data.data
+            const data = {
+                id: invoice.id,
+                invoiceNumber: response.data.data.attributes.InvoiceNumber,
+                NCF: invoice.attributes.NCF?? "",
+                RNC: invoice.attributes.RNC?? "",
+                note: invoice.attributes.Note,
+                paidWith: invoice.attributes.PaidWith,
+                returned: invoice.attributes.Returned,
+                delivery: invoice.attributes.Delivery,
+                total: invoice.attributes.Total,
+                createdAt: invoice.attributes.createdAt,
+                paymentMethodId: invoice.attributes.Payment_Method.data.id
+            };
+            return data;
         })
         .catch(error => { throw error; });
     },
@@ -57,6 +82,7 @@ export const InvoiceAPI = {
                     returned: invoice.attributes.Returned,
                     status: invoice.attributes.Status,
                     total: invoice.attributes.Total,
+                    delivery: invoice.attributes.Delivery,
                     createdAt: invoice.attributes.createdAt,
                     creditNoteAppliedNumber: invoice.attributes.CreditNoteApplied.data !== null ? invoice.attributes.CreditNoteApplied.data.attributes.CreditNoteNumber : "",
                     creditNoteAppliedValue: invoice.attributes.CreditNoteApplied.data !== null ? invoice.attributes.CreditNoteApplied.data.attributes.Total : 0,
@@ -84,6 +110,29 @@ export const InvoiceAPI = {
         })
         .catch(error => { throw error; });
     },
+    getPendingInvoices: function (_number) {
+        return instance.request({
+        url: `/invoices?populate[Payment_Method][fields][0]=id&filters[Status][$eq]=Pending`,
+        method: 'GET',
+        })
+        .then(response => {
+            const data = response.data.data.map(invoice => ({
+                id: invoice.id,
+                invoiceNumber: invoice.attributes.InvoiceNumber,
+                NCF: invoice.attributes.NCF?? "",
+                RNC: invoice.attributes.RNC?? "",
+                note: invoice.attributes.Note,
+                paidWith: invoice.attributes.PaidWith,
+                returned: invoice.attributes.Returned,
+                status: invoice.attributes.Status,
+                total: invoice.attributes.Total,
+                createdAt: invoice.attributes.createdAt,
+                paymentMethodId: invoice.attributes.Payment_Method.data.id
+            }));
+            return data;
+        })
+        .catch(error => { throw error; });
+    },
     create: function(_data) {
         let data = {
             'data': {
@@ -94,8 +143,9 @@ export const InvoiceAPI = {
                 "RNC": _data.RNC,
                 "Note": _data.note,
                 "Status": _data.status,
+                "Delivery": _data.delivery,
                 "Total": _data.total,
-                "CreatedAt": _data.createdAt,
+                "createdAt": _data.createdAt,
                 "CreditNoteApplied": {
                     "id": _data.creditNoteAppliedId,
                 },
@@ -136,6 +186,7 @@ export const InvoiceAPI = {
         let data = {
             'data': {
                 "Status": _data.status,
+                "NCF": null,
             }
         }
         return instance.request({
@@ -146,16 +197,28 @@ export const InvoiceAPI = {
         .then(response => response.data)
         .catch(error => { throw error; });
     },
+    getInvoiceProductsTotalByProductID: function (_productId) {
+        return instance.request({
+        url: `/invoice-products?fields[0]=id&filters[Product][id][$eq]=${_productId}`,
+        method: 'GET',
+        })
+        .then(response => {
+            
+            return response.data.meta.pagination.total;
+        })
+        .catch(error => { throw error; });
+    },
     addInvoiceProduct: function(_invoiceId, _product) {
         let data = {
             'data': {
                 "Price": _product.price,
+                "Cost": _product.cost,
                 "Product": {
                     "id": _product.productId
                 },
                 "Invoice": {
                     "id": _invoiceId
-                }
+                },
             }
         }
         return instance.request({

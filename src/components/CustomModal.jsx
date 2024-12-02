@@ -16,8 +16,12 @@ const CustomModal = ({
   setOpen,
   onClick,
   message,
-  onSubmit,
-  submitButtonText,
+  onClickButton_1,
+  buttonText_1,
+  buttonColor_1 = "secondary",
+  onClickButton_2,
+  buttonText_2,
+  buttonColor_2 = "error",
   disableBackdropClick = false,
 }) => {
   const theme = useTheme();
@@ -54,19 +58,31 @@ const CustomModal = ({
             p: 4,
           }}
         >
-          <Typography id="modal-modal-title" variant="h3" fontWeight={"bold"}>
+          <Typography
+            id="modal-modal-title"
+            component={"span"}
+            variant="h3"
+            fontWeight={"bold"}
+          >
             {message.header}
           </Typography>
-          <Typography
-            id="modal-modal-description"
-            fontSize={"15px"}
-            sx={{ mt: 2, mb: 2 }}
-          >
-            {message.body}
-          </Typography>
-          <Box display={"flex"} justifyContent={"end"}>
-            <Button color="secondary" variant="contained" onClick={onSubmit}>
-              {submitButtonText}
+          <Box padding={"20px 0px"}>{message.body}</Box>
+          <Box display={"flex"} gap={1} justifyContent={"end"}>
+            {onClickButton_2 && (
+              <Button
+                color={buttonColor_2}
+                variant="contained"
+                onClick={onClickButton_2}
+              >
+                {buttonText_2}
+              </Button>
+            )}
+            <Button
+              color={buttonColor_1}
+              variant="contained"
+              onClick={onClickButton_1}
+            >
+              {buttonText_1}
             </Button>
           </Box>
         </Box>

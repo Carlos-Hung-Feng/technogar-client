@@ -67,6 +67,7 @@ export const CreditNoteAPI = {
         .catch(error => { throw error; });
     },
     create: function(_data) {
+        console.log(_data)
         let data = {
             'data': {
                 "CreditNoteNumber": _data.creditNoteNumber,
